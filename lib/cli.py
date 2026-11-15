@@ -14,6 +14,8 @@ from .util import (ADS, BRANDS, CONFIG_DIR, MEDIA, ROOT, Fail, Timer, config,
 HELP = """adstudio commands
 
   Footage
+    watch add <brand> <folder>    remember a footage or assets folder (watch list, watch remove)
+    sync [--dry-run]              find new files in watched folders; ingest, transcribe, analyze
     ingest <brand> <path...>      register footage, build proxies, transcribe
     clips [brand]                 list clips
     clip <id>                     one clip: details, shot log, transcript
@@ -156,7 +158,8 @@ def cmd_frame(a):
 
 def _ids_or_all(a, need):
     if "--all" in a or not a:
-        return [m for m in media.all_clips() if m["kind"] == "video"
+        kinds = ("video", "image") if need == "shots.json" else ("video",)
+        return [m for m in media.all_clips() if m["kind"] in kinds
                 and not os.path.exists(os.path.join(media.clip_dir(m["id"]), need))]
     return [media.find(x) for x in a if not x.startswith("--")]
 
@@ -229,6 +232,23 @@ def cmd_render(a):
     p.add_argument("--aspect", default="all")
     o = p.parse_args(a)
     render.render_ad(_ad_dir(o.ad), mode="final", aspects=o.aspect)
+
+
+def cmd_watch(a):
+    from . import sync
+    if a and a[0] == "add" and len(a) == 3:
+        sync.add(a[1], a[2])
+    elif a and a[0] == "remove" and len(a) == 2:
+        sync.remove(a[1])
+    elif not a or a[0] == "list":
+        sync.listing()
+    else:
+        raise Fail("usage: adstudio watch add <brand> <folder> | remove <folder> | list")
+
+
+def cmd_sync(a):
+    from . import sync
+    sync.sync(dry_run="--dry-run" in a, do_analyze="--no-analyze" not in a)
 
 
 def cmd_snapshot(a):
@@ -490,7 +510,7 @@ COMMANDS = {"voice": cmd_voice, "ingest": cmd_ingest, "clips": cmd_clips, "clip"
             "key": cmd_key, "config": cmd_config, "snapshot": cmd_snapshot,
             "feedback": cmd_feedback, "history": cmd_history, "restore": cmd_restore,
             "wait": cmd_wait, "serve": cmd_serve, "setup": cmd_setup,
-            "brand": cmd_brand, "where": cmd_where}
+            "brand": cmd_brand, "where": cmd_where, "watch": cmd_watch, "sync": cmd_sync}
 
 
 def main(argv):

@@ -114,8 +114,25 @@ def _transcribe(paths):
         os.remove(w)
 
 
-def words(path):
-    return (load_json(words_path(path)) or {}).get("words", [])
+def words(path, text=None):
+    """Word timings for a VO file. With `text` (what the captions should say),
+    the spelling comes from the text and the timing from the transcript, so
+    "Goodkind" stays "Goodkind" and a spoken "twenty four seven" can show as 24/7."""
+    ws = (load_json(words_path(path)) or {}).get("words", [])
+    if not text or not ws:
+        return ws
+    toks = text.split()
+    if len(toks) == len(ws):
+        return [dict(w, w=t) for w, t in zip(ws, toks)]
+    # different word counts: spread the text over the spoken span by characters
+    a, b = ws[0]["start"], ws[-1]["end"]
+    total = float(sum(len(t) + 1 for t in toks))
+    res, pos = [], 0
+    for t in toks:
+        s0 = a + (b - a) * pos / total
+        pos += len(t) + 1
+        res.append({"w": t, "start": round(s0, 3), "end": round(a + (b - a) * pos / total, 3)})
+    return res
 
 
 def build(ad_dir, force=False):
@@ -132,8 +149,22 @@ def build(ad_dir, force=False):
     made = 0
     with Timer("voice %d lines" % len(lines)):
         for i, v in enumerate(lines):
+            if v.get("clip"):            # a clip's own sound, e.g. talking under cutaways
+                from . import media
+                m = media.find(v["clip"])
+                a0, a1 = float(v.get("in", 0)), float(v.get("out", m["duration"]))
+                sig = sha("voclip", m["id"], a0, a1)[:12]
+                rel_file = "vo/line-%02d-clip-%s.wav" % (i + 1, sig)
+                if force or not os.path.exists(os.path.join(ad_dir, rel_file)):
+                    run(["ffmpeg", "-v", "error", "-y", "-ss", "%.4f" % a0, "-t", "%.4f" % (a1 - a0),
+                         "-i", m["src"], "-vn", "-ac", "2", "-ar", "48000",
+                         os.path.join(ad_dir, rel_file)])
+                    made += 1
+                    out("  line %d  sound of %s %.2f-%.2f" % (i + 1, m["id"], a0, a1))
+                v["file"] = rel_file
+                continue
             if not v.get("text") and not v.get("file"):
-                raise Fail("vo line %d needs 'text' or 'file'" % i)
+                raise Fail("vo line %d needs 'text', 'file' or 'clip'" % i)
             sig = sha("vo1", v.get("text"), cfg["voice_model"], cfg["voice_id"],
                       cfg.get("voice_speed"))[:12]
             scratch = v.get("text") and (not v.get("file") or v.get("_sig"))

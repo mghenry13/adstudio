@@ -94,8 +94,8 @@ Back it up however you like; it is set up to work as its own private git repo
 
 `adstudio help` lists everything. The ones you will see most:
 
-    ingest <brand> <folder>     register footage, transcribe it
-    analyze --all               log what is in each clip
+    watch add <brand> <folder>  remember a footage or assets folder
+    sync                        process anything new in watched folders
     search <words>              find moments
     preview <brand>/<ad>        fast draft
     snapshot <brand>/<ad>       keep a version (shows on the page)
@@ -103,6 +103,10 @@ Back it up however you like; it is set up to work as its own private git repo
     ref add <brand> <file|url>  break down an ad you like
 
 ## Notes
+
+- A free Gemini key allows about 20 analyses a day. For a real footage
+  library, turn on billing for the key's project in Google AI Studio. The
+  cost is small: cents per ten minutes of footage.
 
 - Sound in paid ads needs a licence you can point to. The sound library
   records a source and licence for every file.

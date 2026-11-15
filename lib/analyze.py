@@ -88,6 +88,10 @@ class GeminiError(Fail):
     pass
 
 
+class QuotaError(GeminiError):
+    """The key's daily allowance is used up. Retrying today cannot help."""
+
+
 def _key():
     k = read_key("gemini")
     if not k:
@@ -112,7 +116,19 @@ def _http(method, url, key, body=None, headers=None, timeout=300, raw=False):
                     return r.headers, payload
                 return json.loads(payload or b"{}")
         except urllib.error.HTTPError as e:
-            last = "HTTP %s: %s" % (e.code, e.read()[:300].decode("utf-8", "replace"))
+            raw = e.read().decode("utf-8", "replace")
+            last = "HTTP %s: %s" % (e.code, raw[:300])
+            if e.code == 429 and ("per day" in raw or "free_tier" in raw):
+                import re
+                wait = re.search(r"retry in ([0-9hms.]+)", raw)
+                free = "free_tier" in raw
+                raise QuotaError(
+                    "Gemini daily limit reached%s%s. %s" % (
+                        " (free tier)" if free else "",
+                        ", resets in about %s" % wait.group(1).split(".")[0] + "s"
+                        if wait else "",
+                        "Turn on billing for this key's project in Google AI Studio "
+                        "to lift the limit." if free else ""))
             if e.code in (429, 500, 502, 503, 504):
                 time.sleep(2 ** attempt)
                 continue
@@ -238,6 +254,65 @@ def analyze_clip(m, note="", model=None):
     return data
 
 
+IMAGE_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "summary": {"type": "STRING"},
+        "kind": {"type": "STRING", "enum": ["photo", "logo", "graphic", "screenshot",
+                                            "product-shot", "illustration", "other"]},
+        "text_in_image": {"type": "STRING"},
+        "quality": {"type": "INTEGER"},
+        "hook": {"type": "INTEGER"},
+        "subject_x": {"type": "NUMBER"},
+        "subject_y": {"type": "NUMBER"},
+        "colors": {"type": "ARRAY", "items": {"type": "STRING"}},
+        "tags": {"type": "ARRAY", "items": {"type": "STRING"}}},
+    "required": ["summary", "kind", "quality", "hook", "subject_x", "subject_y", "tags"]}
+
+IMAGE_PROMPT = """You are logging a still image for an editor who makes short social ads.
+Brand: %(brand)s. %(note)s
+Give: summary (one plain sentence: who or what is shown), kind, any text visible
+in the image, quality 1 to 5 (sharpness, exposure, framing), hook 1 to 5 (would it
+stop someone scrolling), subject_x and subject_y (where the main subject sits,
+fractions from the left and top), the main colors as hex, and 3 to 8 lowercase
+search tags. Be literal."""
+
+
+def analyze_image(m, note="", model=None):
+    key = _key()
+    model = model or config()["gemini_model"]
+    tmp = os.path.join(media.clip_dir(m["id"]), "analysis.jpg")
+    run(["ffmpeg", "-v", "error", "-y", "-i", m["src"], "-vf",
+         "scale='min(1600,iw)':-2", "-frames:v", "1", "-q:v", "3", tmp])
+    with open(tmp, "rb") as f:
+        part = {"inline_data": {"mime_type": "image/jpeg",
+                                "data": base64.b64encode(f.read()).decode()}}
+    os.unlink(tmp)
+    body = {"contents": [{"parts": [part, {"text": IMAGE_PROMPT % {
+        "brand": _brand_line(m.get("brand")), "note": note}}]}],
+        "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json",
+                             "responseSchema": IMAGE_SCHEMA}}
+    d = _http("POST", "%s/v1beta/models/%s:generateContent" % (API, model), key, body=body)
+    cand = (d.get("candidates") or [{}])[0]
+    text = "".join(p.get("text", "") for p in cand.get("content", {}).get("parts", []))
+    try:
+        r = json.loads(text)
+    except ValueError:
+        raise GeminiError("Gemini returned something that is not JSON for %s" % m["id"])
+    u = d.get("usageMetadata", {})
+    # Stored in the same shape as a video shot log, so search treats both alike.
+    return {"summary": r["summary"], "kind": r.get("kind"),
+            "text_in_image": r.get("text_in_image", ""), "colors": r.get("colors", []),
+            "shots": [{"start": 0, "end": 0, "description": r["summary"],
+                       "shot_type": "other", "camera": "static", "speech": False,
+                       "quality": r["quality"], "hook": r["hook"], "issues": [],
+                       "subject_x": r["subject_x"], "subject_y": r["subject_y"],
+                       "tags": r["tags"] + ([r["kind"]] if r.get("kind") else [])}],
+            "best_moments": [],
+            "_usage": {"model": model, "in": u.get("promptTokenCount", 0),
+                       "out": u.get("candidatesTokenCount", 0) + u.get("thoughtsTokenCount", 0)}}
+
+
 def save_shots(m, data, source="gemini"):
     dur = m.get("duration") or 0
     shots = []
@@ -245,7 +320,7 @@ def save_shots(m, data, source="gemini"):
         a, b = max(0.0, float(s["start"])), float(s["end"])
         if dur:
             b = min(b, dur)
-        if b <= a:
+        if b <= a and m.get("kind") != "image":
             continue
         s = dict(s, start=round(a, 2), end=round(b, 2))
         s["tags"] = [str(t).lower() for t in s.get("tags", [])]
@@ -257,28 +332,43 @@ def save_shots(m, data, source="gemini"):
 
 
 def run_for(metas, backend=None, note="", force=False):
-    todo = [m for m in metas if m["kind"] == "video" and (
+    todo = [m for m in metas if m["kind"] in ("video", "image") and (
         force or not os.path.exists(os.path.join(media.clip_dir(m["id"]), "shots.json")))]
     if not todo:
         out("shot logs up to date")
         return
     _key()
-    tin = tout = 0
+    tin = tout = done = 0
+
+    stop = []
 
     def work(m):
+        if stop:                         # daily limit hit: do not keep asking
+            return m, None, None
         try:
-            return m, save_shots(m, analyze_clip(m, note)), None
+            fn = analyze_image if m["kind"] == "image" else analyze_clip
+            return m, save_shots(m, fn(m, note)), None
+        except QuotaError as e:
+            stop.append(str(e))
+            return m, None, None
         except Fail as e:
-            return m, None, str(e)
+            return m, None, str(e).splitlines()[0][:200]
 
-    with Timer("analyze %d clips" % len(todo)):
+    with Timer("analyze %d files" % len(todo)):
         with ThreadPoolExecutor(max_workers=4) as ex:
             for m, data, err in ex.map(work, todo):
                 if err:
                     out("  FAIL %s: %s" % (m["id"], err))
                     continue
+                if data is None:
+                    continue
+                done += 1
                 u = data.get("_usage", {})
                 tin, tout = tin + u.get("in", 0), tout + u.get("out", 0)
                 out("  %-40s %2d shots  %s" % (m["id"], len(data["shots"]),
                                                data.get("summary", "")[:80]))
-    out("tokens: %d in, %d out" % (tin, tout))
+    out("analyzed %d of %d (tokens: %d in, %d out)" % (done, len(todo), tin, tout))
+    if stop:
+        out("STOPPED: %s" % stop[0])
+        out("  %d files are waiting; the next `adstudio sync` or `analyze --all` "
+            "picks them up." % (len(todo) - done))

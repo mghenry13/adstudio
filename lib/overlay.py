@@ -38,13 +38,21 @@ def brand_css(brand):
     return p
 
 
-def page(brand, aspect, body, extra_css=""):
+def ad_css(ad_dir):
+    """Optional per-ad style overrides: ad.css next to timeline.json."""
+    p = os.path.join(ad_dir, "ad.css") if ad_dir else ""
+    return p if p and os.path.exists(p) else ""
+
+
+def page(brand, aspect, body, extra_css="", ad_dir=None):
+    extra_link = ("<link rel='stylesheet' href='file://%s'>" % ad_css(ad_dir)
+                  if ad_css(ad_dir) else "")
     return ("<!doctype html><html><head><meta charset='utf-8'>"
             "<title>adstudio overlay</title>"
             "<link rel='stylesheet' href='file://%s'>"
-            "<link rel='stylesheet' href='file://%s'>"
+            "<link rel='stylesheet' href='file://%s'>%s"
             "<style>%s</style></head><body class='%s'>%s</body></html>"
-            % (brand_css(brand), os.path.join(TEMPLATES, "overlay.css"),
+            % (brand_css(brand), os.path.join(TEMPLATES, "overlay.css"), extra_link,
                extra_css, aspect_class(aspect), body))
 
 
@@ -67,18 +75,27 @@ def overlay_html(ov, brand, aspect, ad_dir):
         inner = "<img src='file://%s' style='width:%.2fvw'>" % (
             src, float(ov.get("width", 0.4)) * 100)
     else:
-        inner = "<span class='t' style='%s'>%s</span>" % (
-            ";".join(tstyle), _rich(ov.get("text", "")))
+        icon = ""
+        if ov.get("icon"):             # small picture before the words, e.g. a pill with an icon
+            ip = resolve(ov["icon"], ad_dir)
+            if not os.path.exists(ip):
+                raise Fail("overlay icon not found: %s" % ov["icon"])
+            icon = "<img class='icon' src='file://%s'>" % ip
+        inner = "<span class='t' style='%s'>%s%s</span>" % (
+            ";".join(tstyle), icon, _rich(ov.get("text", "")))
     body = "<div class='%s' style='%s'>%s</div>" % (
         " ".join(cls), ";".join(style), inner)
-    return page(brand, aspect, body)
+    return page(brand, aspect, body, ad_dir=ad_dir)
 
 
 def _sig_assets(brand, ov, ad_dir):
     sig = [file_sig(brand_css(brand)),
            file_sig(os.path.join(TEMPLATES, "overlay.css"))]
-    if ov.get("image"):
-        sig.append(file_sig(resolve(ov["image"], ad_dir)))
+    for k in ("image", "icon"):
+        if ov.get(k):
+            sig.append(file_sig(resolve(ov[k], ad_dir)))
+    if ad_css(ad_dir):
+        sig.append(file_sig(ad_css(ad_dir)))
     return sig
 
 
@@ -116,7 +133,7 @@ def prepare(overlays, brand, aspect, W, H, ad_dir):
             continue
         spec = dict((k, ov.get(k)) for k in
                     ("text", "style", "pos", "align", "y", "size", "color", "bg",
-                     "image", "width"))
+                     "image", "width", "icon"))
         key = sha("ov1", spec, brand, aspect, W, H, _sig_assets(brand, ov, ad_dir))[:20]
         png = os.path.join(RCACHE, "ov-%s.png" % key)
         ov["png"], ov["key"] = png, key

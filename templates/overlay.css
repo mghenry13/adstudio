@@ -66,3 +66,5 @@ body.aspect-16x9 { --safe-x: 110px; --safe-top: 70px; --safe-bottom: 80px;  --ca
   color: var(--ink); text-wrap: balance; }
 
 .ov img { display: block; height: auto; }
+.t .icon { display: inline-block; height: 1.7em; width: auto; vertical-align: middle;
+  margin: -0.25em 0.45em -0.2em 0; border-radius: 0.35em; }

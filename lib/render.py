@@ -83,8 +83,8 @@ def _slices(seg, overlays):
         a, b = max(ov["start"], s) - s, min(ov["end"], e) - s
         f = ov.get("fade", 0)
         res.append({"ov": ov, "a": round(a, 4), "b": round(b, 4),
-                    "fi": f if ov["start"] >= s - EPS else 0,
-                    "fo": f if ov["end"] <= e + EPS else 0,
+                    "fi": ov.get("fade_in", f) if ov["start"] >= s - EPS else 0,
+                    "fo": ov.get("fade_out", f) if ov["end"] <= e + EPS else 0,
                     "off": round(max(0.0, s - ov["start"]), 4)})
     return res
 
@@ -230,7 +230,7 @@ def _audio(R, mode):
             args += ["-stream_loop", "-1"]
         args += ["-ss", "%.3f" % float(mu.get("start", 0)), "-i",
                  resolve(mu["file"], R["dir"])]
-        f = ("[%d:a]%s,atrim=0:%.4f,volume=%.2fdB,afade=t=in:d=%.3f,"
+        f = ("[%d:a]%s,asetpts=N/SR/TB,atrim=0:%.4f,volume=%.2fdB,afade=t=in:d=%.3f,"
              "afade=t=out:st=%.4f:d=%.3f,adelay=%d:all=1[mu]"
              % (k, norm, length, float(mu.get("gain_db", -16)),
                 float(mu.get("fade_in", 0.05)), max(0, length - fo), fo,
@@ -256,8 +256,10 @@ def _audio(R, mode):
     tail = "alimiter=limit=0.94"
     if mode == "final":
         tail = "loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000," + tail
+    # atrim counts from the stream's own timestamps; reset them to a plain sample
+    # clock first, or a seeked or delayed input can leave apad running forever
     graph.append("%samix=inputs=%d:normalize=0:dropout_transition=0,%s,apad,"
-                 "atrim=0:%.4f[aout]" % ("".join(bus), len(bus), tail, total))
+                 "asetpts=N/SR/TB,atrim=0:%.4f[aout]" % ("".join(bus), len(bus), tail, total))
     return args, ";".join(graph)
 
 

@@ -50,8 +50,11 @@ fonts: ask, or read them from the brand's own site.
 
 1. `adstudio clips <brand>` and `adstudio search <words>` to find moments.
    `adstudio clip <id>` shows a clip's shot log and timed transcript.
-   New footage: `adstudio ingest <brand> <folder>` then `adstudio analyze --all`.
-   Only ingest when the user asks.
+   New footage: `adstudio sync` picks up anything new in the watched folders
+   (`adstudio watch list`; add one with `watch add <brand> <folder>`) and
+   ingests, transcribes and analyzes only the new files. `sync --dry-run`
+   shows what is new first. One-off folders: `adstudio ingest <brand> <folder>`.
+   If Gemini reports a daily limit, say so plainly; sync resumes where it stopped.
 2. `adstudio new <brand> <ad>` then write `ads/<brand>/<ad>/timeline.json`.
    Cut on word timings from the transcript, not on guesses.
 3. `adstudio preview <brand>/<ad>`. It prints timings and the page URL

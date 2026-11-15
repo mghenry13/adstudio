@@ -34,18 +34,26 @@ shot logs give `subject_x`, `subject_y`), `focus_by_aspect: {"1:1": [x, y]}`,
 ## overlays
 
 Each has `start` and `end` on the ad's clock, or `seg: <index>` to make them
-relative to one segment (they then move with it). `fade` defaults to 0.12.
+relative to one segment (they then move with it). `fade` defaults to 0.12;
+`fade_in` / `fade_out` set one side only (a fade to black is a full-frame
+overlay with `fade_in` and `"fade_out": 0` at the end).
 `aspects: ["9:16"]` limits an overlay to some sizes.
 
 | Kind | Fields |
 |---|---|
-| Text | `text` (`\n` breaks a line, `*word*` highlights), `style`, `pos`, optional `size` (multiplier), `align`, `color`, `bg`, `y` (0 to 1) |
+| Text | `text` (`\n` breaks a line, `*word*` highlights), `style`, `pos`, optional `size` (multiplier), `align`, `color`, `bg`, `y` (0 to 1), `icon` (image shown before the words) |
 | Image | `image` (path), `width` (fraction of frame width), `pos` |
 | Animation | `gfx` (name of a rendered HyperFrames project) or `video` (path to a file with alpha) |
 
 Styles: `hook`, `caption`, `title`, `label`, `cta`, `hand`, `plain`, `display`.
 Positions: `top`, `upper`, `center`, `lower`, `caption`, `bottom`. Both are
 defined in `templates/overlay.css`, with safe zones per aspect.
+
+## Per-ad styles
+
+An `ad.css` next to `timeline.json` loads after the brand and overlay styles,
+so one ad can use a partner's font or tweak a style without touching the
+brand kit. Use absolute `file://` URLs for its `@font-face` sources.
 
 ## captions
 
@@ -74,10 +82,15 @@ segment that has sound: `max_words` (3), `max_chars` (18), `upper`, `style`, `po
 `text` (Fish Audio S2.1 Pro on Runware, your Runware key) and saves word timings
 for every line, so captions follow the voice. `at` is where the first word lands.
 To use your own recording, set `file` (and drop `text`), then run `voice` again.
+A line can also be a clip's own sound, `{"clip": "<id>", "in": 0.15, "out": 7.45,
+"at": 2.5}`, so someone keeps talking while the picture cuts away (mute those
+footage segments with `volume: 0`).
 Settings: `adstudio config voice_id adrian` (adrian, ethan, jordan, laura, sarah,
 hannah, selene, or any Fish voice id) and `voice_speed` (0.5 to 2). VO is speech,
 so `music.duck` lowers the music under it; set `"duck": false` for a steady bed.
-`captions: false` on a line leaves it uncaptioned.
+`captions: false` on a line leaves it uncaptioned. Captions spell words as the
+line's `text` (or `caption`, when the screen should read differently from what is
+said, like `"text": "open twenty four seven"`, `"caption": "Open 24/7"`).
 
 ## What the Premiere XML carries
 

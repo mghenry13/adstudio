@@ -187,11 +187,11 @@ def _register(path, brand):
     return m, True
 
 
-def ingest(paths, brand, workers=3):
+def ingest(paths, brand, workers=3, quiet=False):
     files = _collect(paths)
     if not files:
         raise Fail("no video or image files found")
-    with Timer("register %d files" % len(files)):
+    with Timer("register %d files" % len(files), quiet=quiet):
         metas = [_register(f, brand) for f in files]
 
     def work(pair):
@@ -202,17 +202,18 @@ def ingest(paths, brand, workers=3):
         _build_audio(m)
         return m, made
 
-    with Timer("proxies"):
+    with Timer("proxies", quiet=quiet):
         with ThreadPoolExecutor(max_workers=workers) as ex:
             done = list(ex.map(work, metas))
     new = sum(1 for _, made in done if made)
-    for m, made in done:
+    for m, made in ([] if quiet else done):
         tag = "new " if made else "have"
         extra = " HDR>SDR" if m.get("hdr") else ""
         out("  %s  %-36s %5.1fs %dx%d %.4gfps%s" % (
             tag, m["id"], m.get("duration", 0), m["width"], m["height"],
             m["fps"], extra))
-    out("%d clips, %d newly processed" % (len(done), new))
+    if not quiet:
+        out("%d clips, %d newly processed" % (len(done), new))
     return [m for m, _ in done]
 
 

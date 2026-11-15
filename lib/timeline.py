@@ -119,6 +119,9 @@ def resolve(ad_dir, aspect):
         if ov["end"] <= ov["start"]:
             continue
         ov["fade"] = float(o.get("fade", 0.12 if not o.get("_caption") else 0))
+        for k in ("fade_in", "fade_out"):      # one side only, e.g. a fade to black
+            if k in o:
+                ov[k] = float(o[k])
         if o.get("gfx"):
             ov["video"] = os.path.join(ad_dir, "gfx", o["gfx"], "render-%s.mov"
                                        % aspect.replace(":", "x"))
@@ -168,7 +171,7 @@ def _vo_captions(tl, ad_dir, total):
         if v.get("captions") is False or not v.get("file"):
             continue
         at = float(v.get("at", 0))
-        ws = voice.words(rpath(v["file"], ad_dir))
+        ws = voice.words(rpath(v["file"], ad_dir), v.get("caption") or v.get("text"))
         chunks = _chunk(ws, int(cfg.get("max_words", 3)), int(cfg.get("max_chars", 18)))
         for k, ch in enumerate(chunks):
             a = at + ch[0]["start"]
