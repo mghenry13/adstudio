@@ -19,9 +19,9 @@ CSS = """
 :root{--bg:#f4f1ec;--card:#fff;--ink:#16181b;--mute:#6b7076;--line:#e2ddd5;--accent:#c8501e}
 @media (prefers-color-scheme:dark){:root{--bg:#131517;--card:#1c1f22;--ink:#e8e6e1;--mute:#8e949a;--line:#2b2f33;--accent:#f0794a}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
 .wrap{max-width:1180px;margin:0 auto;padding:22px 24px 80px}
-h1{font-size:24px;margin:0;font-weight:650}
+h1{font-size:18px;margin:0;font-weight:650}
 .sub{color:var(--mute);font-size:13px;margin-top:2px}
 nav{margin:14px 0 6px;display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
 nav a{color:var(--mute)}

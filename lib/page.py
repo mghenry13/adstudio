@@ -16,9 +16,9 @@ CSS = """
 @media (prefers-color-scheme:dark){:root{--bg:#0f0f10;--panel:#17171a;--ink:#f4f4f5;--mute:#a1a1aa;--faint:#63636b;--line:#26262b;--hover:#1f1f23;--accent:#ff7a50;--ok:#4ade80;--warn:#fbbf24}}
 *{box-sizing:border-box}
 html{-webkit-font-smoothing:antialiased}
-body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
 header{max-width:1120px;margin:0 auto;padding:26px 28px 18px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;flex-wrap:wrap}
-h1{font-size:19px;margin:0;font-weight:600;letter-spacing:-.01em}
+h1{font-size:16px;margin:0;font-weight:600;letter-spacing:0}
 .sub{color:var(--mute);font-size:13px;margin-left:10px;font-weight:400}
 .finals{font-size:13px;color:var(--mute);display:flex;gap:14px}
 .finals a{color:var(--mute);text-decoration:none;border-bottom:1px solid var(--line)}
@@ -32,7 +32,7 @@ video{width:100%;border-radius:12px;background:#000;display:block;max-height:76v
 .tabs button{font:inherit;font-size:12px;padding:3px 10px;border-radius:7px;border:0;background:none;color:var(--mute);cursor:pointer}
 .tabs button:hover{background:var(--hover)}
 .tabs button.on{background:var(--hover);color:var(--ink);font-weight:500}
-h2{font-size:16px;margin:0;font-weight:600;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;letter-spacing:-.01em}
+h2{font-size:14px;margin:0;font-weight:600;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;letter-spacing:0}
 h2 small,summary small{font-size:13px;color:var(--mute);font-weight:400}
 .note{color:var(--mute);margin-top:4px}
 .compose{display:flex;gap:10px;align-items:center;margin-top:18px;padding:6px 6px 6px 10px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
