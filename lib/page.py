@@ -75,6 +75,8 @@ summary:hover{background:var(--hover)}
 summary::before{content:"\\203A";color:var(--faint);display:inline-block;width:10px;transition:transform .15s}
 details[open] summary::before{transform:rotate(90deg)}
 details .v{padding:8px 4px 26px}
+.newv{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:5;font:inherit;font-size:13.5px;font-weight:600;padding:9px 18px;border-radius:99px;border:0;background:var(--ink);color:var(--bg);cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.newv[hidden]{display:none}
 .empty{background:var(--panel);border:1px dashed var(--line);border-radius:16px;padding:24px;color:var(--mute)}
 code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace}
 """
@@ -82,27 +84,12 @@ code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace}
 JS = """
 const AD = %(ad)s; let STAMP = %(stamp)d;
 const $ = (s, r=document) => r.querySelector(s);
-document.querySelectorAll('.tabs').forEach(t => t.addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  const v = t.parentElement.querySelector('video'), at = v.currentTime, playing = !v.paused;
-  v.src = b.dataset.src; v.currentTime = at; if (playing) v.play();
-  t.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
-}));
-const box = $('#fb'), go = $('#go'), msg = $('#msg'), chip = $('#tc');
 const KEY = 'adstudio-draft-' + AD;
 const fmt = t => Math.floor(t / 60) + ':' + (t %% 60 < 10 ? '0' : '') + (t %% 60).toFixed(1);
 const vidOf = el => el.closest('.v').querySelector('video');
-// Timecodes and markers seek the video in their own version card.
-document.addEventListener('click', e => {
-  const s = e.target.closest('[data-seek]');
-  if (s) { const v = vidOf(s); v.currentTime = +s.dataset.seek; v.pause(); return; }
-});
-document.querySelectorAll('.v').forEach(card => {
-  const v = card.querySelector('video'), head = card.querySelector('.marks b');
-  if (v && head) v.addEventListener('timeupdate', () => { if (v.duration) head.style.left = (v.currentTime / v.duration * 100) + '%%'; });
-});
-// Comments are added, deleted and sent in place. The page only reloads when
-// a new version arrives, so the video never loses its position.
+let box, boxw, go, msg, chip, at = 0, fresh = null;
+
+function say(t, cls) { if (msg) { msg.textContent = t; msg.className = 'msg ' + (cls || ''); } }
 async function post(body) {
   const r = await fetch('/api/feedback', {method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(Object.assign({ad: AD, version: +go.dataset.v}, body))});
@@ -132,75 +119,121 @@ function addRow(text, t, id) {
     box.closest('.v').querySelector('.marks').appendChild(m); }
   label();
 }
-if (box) {
-  const v = vidOf(box), boxw = $('#fbw');
-  let at = 0;
+// Adds whatever is typed in either box; with redo, then sends every comment.
+async function send(redo) {
+  const items = [];
+  if (box.value.trim()) items.push([box, box.value.trim(), Math.round(at * 100) / 100, KEY]);
+  if (boxw.value.trim()) items.push([boxw, boxw.value.trim(), null, KEY + '-whole']);
+  if (!items.length && !redo) return;
+  go.disabled = true;
+  try {
+    for (const [el, text, t, key] of items) {
+      const d = await post({text, t, redo: false});
+      addRow(text, t, d.added);
+      el.value = ''; try { localStorage.removeItem(key); } catch (e) {}
+    }
+    if (redo) { await post({text: '', redo: true});
+      document.querySelectorAll('#clist .st.open').forEach(s => { s.className = 'st requested'; s.textContent = 'Sent to Claude'; });
+      document.querySelectorAll('#clist .del').forEach(d => d.remove()); label(); }
+    say('');
+    at = vidOf(box).currentTime; chip.textContent = fmt(at);
+  } catch (e) {
+    say(e.message === 'add a comment first' ? 'Add a comment first.'
+        : 'Could not send. Is the preview server running? (adstudio serve) ' + e.message, 'warn');
+  }
+  go.disabled = false;
+}
+
+// Clicks are handled once for the whole page, so they keep working after
+// a new version is swapped in.
+document.addEventListener('click', async e => {
+  const tab = e.target.closest('.tabs button');
+  if (tab) { const t = tab.parentElement, v = t.parentElement.querySelector('video'), pos = v.currentTime, playing = !v.paused;
+    v.src = tab.dataset.src; v.currentTime = pos; if (playing) v.play();
+    t.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === tab)); return; }
+  const s = e.target.closest('[data-seek]');
+  if (s) { const v = vidOf(s); v.currentTime = +s.dataset.seek; v.pause(); return; }
+  if (e.target.closest('#go')) { send(true); return; }
+  if (e.target.closest('#newv')) { swap(); return; }
+  const d = e.target.closest('.del');
+  if (d) { try { await post({text: '', redo: false, delete: +d.dataset.at});
+      const m = document.querySelector('.marks i[data-at="' + d.dataset.at + '"]'); if (m) m.remove();
+      d.closest('.fb').remove(); label();
+    } catch (err) { say(err.message, 'warn'); } }
+});
+
+// Wires up the comment boxes of the latest version. Runs at load and again
+// after each swap.
+function init() {
+  box = $('#fb'); boxw = $('#fbw'); go = $('#go'); msg = $('#msg'); chip = $('#tc');
+  if (!box) return;
+  const v = vidOf(box);
+  at = 0;
   // The timecode follows the playhead until you start typing, then it holds.
-  const show = () => { chip.textContent = fmt(at); };
-  v.addEventListener('timeupdate', () => { if (!box.value.trim()) { at = v.currentTime; show(); } });
+  v.addEventListener('timeupdate', () => { if (!box.value.trim()) { at = v.currentTime; chip.textContent = fmt(at); } });
   // A half-typed timecode comment keeps its moment across a reload.
   try { const saved = parseFloat(localStorage.getItem(KEY + '-at'));
     if ((localStorage.getItem(KEY) || '').trim() && !isNaN(saved)) { at = saved;
       v.addEventListener('loadedmetadata', () => { v.currentTime = saved; }, {once: true});
       if (v.readyState >= 1) v.currentTime = saved; } } catch (e) {}
-  box.addEventListener('input', () => { try { localStorage.setItem(KEY + '-at', at); } catch (e) {} });
   [[box, KEY], [boxw, KEY + '-whole']].forEach(([el, key]) => {
     try { el.value = localStorage.getItem(key) || ''; } catch (e) {}
-    el.addEventListener('input', () => { if (el === box && el.value.trim()) v.pause();
+    el.addEventListener('input', () => {
+      if (el === box) { if (el.value.trim()) v.pause(); try { localStorage.setItem(KEY + '-at', at); } catch (e) {} }
       try { localStorage.setItem(key, el.value); } catch (e) {} });
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(true); }
+      else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(false); }
+    });
   });
-  // Adds whatever is typed in either box; with redo, then sends every comment.
-  const send = async redo => {
-    const items = [];
-    if (box.value.trim()) items.push([box, box.value.trim(), Math.round(at * 100) / 100, KEY]);
-    if (boxw.value.trim()) items.push([boxw, boxw.value.trim(), null, KEY + '-whole']);
-    if (!items.length && !redo) return;
-    go.disabled = true;
-    try {
-      for (const [el, text, t, key] of items) {
-        const d = await post({text, t, redo: false});
-        addRow(text, t, d.added);
-        el.value = ''; try { localStorage.removeItem(key); } catch (e) {}
-      }
-      if (redo) { await post({text: '', redo: true});
-        document.querySelectorAll('#clist .st.open').forEach(s => { s.className = 'st requested'; s.textContent = 'Sent to Claude'; });
-        document.querySelectorAll('#clist .del').forEach(d => d.remove()); label(); }
-      say('');
-      at = v.currentTime; show();
-    } catch (e) {
-      say(e.message === 'add a comment first' ? 'Add a comment first.'
-          : 'Could not send. Is the preview server running? (adstudio serve) ' + e.message, 'warn');
-    }
-    go.disabled = false;
-  };
-  [box, boxw].forEach(el => el.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(true); }
-    else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(false); }
-  }));
-  go.addEventListener('click', () => send(true));
-  document.addEventListener('click', async e => {
-    const d = e.target.closest('.del'); if (!d) return;
-    try { await post({text: '', redo: false, delete: +d.dataset.at});
-      const m = document.querySelector('.marks i[data-at="' + d.dataset.at + '"]'); if (m) m.remove();
-      d.closest('.fb').remove(); label();
-    } catch (err) { say(err.message, 'warn'); }
-  });
-  show(); label();
+  chip.textContent = fmt(at); label();
 }
-function say(t, cls) { if (msg) { msg.textContent = t; msg.className = 'msg ' + (cls || ''); } }
+
+// A new version never interrupts: it waits behind a button. Clicking it
+// swaps the page content in place, with no reload. Typed text is kept.
+function swap() {
+  if (!fresh) return;
+  const open = [...document.querySelectorAll('details[open] summary')].map(x => x.dataset.n);
+  $('main').replaceWith(fresh.doc.querySelector('main'));
+  $('header').replaceWith(fresh.doc.querySelector('header'));
+  open.forEach(n => { const d = document.querySelector('summary[data-n="' + n + '"]'); if (d) d.parentElement.open = true; });
+  STAMP = fresh.stamp; fresh = null;
+  $('#newv').hidden = true;
+  try { localStorage.removeItem(KEY + '-at'); } catch (e) {}
+  init();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+async function check() {
+  const text = await (await fetch(location.pathname + '?_=' + Date.now(), {cache: 'no-store'})).text();
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+  const stamp = +(text.match(/let STAMP = (\\d+)/) || [0, 0])[1];
+  const theirs = doc.querySelector('#go'), mine = $('#go');
+  if (theirs && mine && +theirs.dataset.v > +mine.dataset.v) {
+    fresh = {doc, stamp};
+    const b = $('#newv'); b.textContent = 'Version ' + theirs.dataset.v + ' is ready. Show it'; b.hidden = false;
+  } else if (theirs && mine && !fresh) {
+    // Same version, something else changed (for example a comment was
+    // marked done): refresh the list quietly, leave the video alone.
+    const a = doc.querySelector('#clist'), m = doc.querySelector('.v.latest .marks');
+    if (a) $('#clist').replaceWith(a);
+    if (m) document.querySelector('.v.latest .marks').replaceWith(m);
+    STAMP = stamp; label();
+  } else if (!mine) { location.reload(); }
+}
 async function poll() {
   try {
     const s = await (await fetch('/api/state?ad=' + encodeURIComponent(AD), {cache: 'no-store'})).json();
-    if (s.stamp && s.stamp > STAMP + 5 && !(box && (box.value.trim() || $('#fbw').value.trim()))) { location.reload(); return; }
+    if (s.stamp && s.stamp > STAMP + 5 && !(fresh && s.stamp <= fresh.stamp + 5)) await check();
     const w = $('#working');
-    if (w) w.textContent = s.pending.length
-      ? (s.listening ? 'Claude has this and is working on the next version. This page updates by itself.'
+    if (w) { w.textContent = s.pending.length
+      ? (s.listening ? 'Claude has this and is working on the next version.'
                      : 'Saved. No chat is watching this ad right now: say "redo" in the adstudio chat.')
       : '';
-    if (w) w.className = 'msg ' + (s.pending.length ? (s.listening ? 'ok' : 'warn') : '');
+      w.className = 'msg ' + (s.pending.length ? (s.listening ? 'ok' : 'warn') : ''); }
   } catch (e) {}
   setTimeout(poll, 1500);
 }
+init();
 poll();
 """
 
@@ -292,9 +325,9 @@ def write(ad_dir, tl):
             cards.append(card)
         else:
             nc, nf = len(v["changes"]), len(fbs)
-            older.append("<details><summary>Version %d <small>%s &middot; %d change%s%s</small>"
+            older.append("<details><summary data-n='%d'>Version %d <small>%s &middot; %d change%s%s</small>"
                          "</summary>%s</details>" % (
-                             v["n"], _when(v["at"]), nc, "" if nc == 1 else "s",
+                             v["n"], v["n"], _when(v["at"]), nc, "" if nc == 1 else "s",
                              " &middot; %d comment%s" % (nf, "" if nf == 1 else "s") if nf else "",
                              card))
     if older:
@@ -326,7 +359,8 @@ def write(ad_dir, tl):
             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
             "<title>%s &middot; adstudio versions</title><style>%s</style></head><body>"
             "<header><h1>%s<span class='sub'>%s &middot; %d version%s</span></h1>%s</header>"
-            "<main>%s</main><script>%s</script></body></html>") % (
+            "<main>%s</main><button id='newv' class='newv' hidden></button>"
+            "<script>%s</script></body></html>") % (
         _e(name), CSS, _e(name), _e(tl.get("brand", "")), len(h),
         "" if len(h) == 1 else "s", finals, "".join(cards),
         JS % {"ad": json.dumps(ad_ref), "stamp": 0})

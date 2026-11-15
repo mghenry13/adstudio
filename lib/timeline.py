@@ -102,6 +102,8 @@ def resolve(ad_dir, aspect):
 
     caps = sorted(_captions(tl, segs) + _vo_captions(tl, ad_dir, pos / float(fps)),
                   key=lambda c: c["start"])
+    for a0, b0 in (tl.get("captions") or {}).get("skip") or []:   # caption-free moments
+        caps = [c for c in caps if c["end"] <= a0 or c["start"] >= b0]
     for c, nxt in zip(caps, caps[1:]):     # one caption on screen at a time
         if c["end"] > nxt["start"]:
             c["end"] = nxt["start"]

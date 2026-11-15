@@ -63,6 +63,7 @@ brand kit. Use absolute `file://` URLs for its `@font-face` sources.
 segment that has sound: `max_words` (3), `max_chars` (18), `upper`, `style`, `pos`, `size`.
 
 Options: `track: true` makes captions move with the camera (see overlays);
+`skip: [[8.8, 9.8]]` leaves those moments without captions (say, under a logo);
 `build: true` reveals each chunk word by word; `emphasis: ["home", "50"]`
 marks those words as highlighted; `word_images: {"lakewood": "lakewood-white.png"}`
 shows a logo in place of a caption that is just that word (or `{"image": .., "width": .5}`); (`em`, which a style or ad.css can make bigger).
