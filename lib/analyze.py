@@ -116,12 +116,12 @@ def _http(method, url, key, body=None, headers=None, timeout=300, raw=False):
                     return r.headers, payload
                 return json.loads(payload or b"{}")
         except urllib.error.HTTPError as e:
-            raw = e.read().decode("utf-8", "replace")
-            last = "HTTP %s: %s" % (e.code, raw[:300])
-            if e.code == 429 and ("per day" in raw or "free_tier" in raw):
+            err = e.read().decode("utf-8", "replace")
+            last = "HTTP %s: %s" % (e.code, err[:300])
+            if e.code == 429 and ("per day" in err or "free_tier" in err):
                 import re
-                wait = re.search(r"retry in ([0-9hms.]+)", raw)
-                free = "free_tier" in raw
+                wait = re.search(r"retry in ([0-9hms.]+)", err)
+                free = "free_tier" in err
                 raise QuotaError(
                     "Gemini daily limit reached%s%s. %s" % (
                         " (free tier)" if free else "",
