@@ -12,8 +12,8 @@ import time
 from . import versions
 
 CSS = """
-:root{--bg:#fafaf9;--panel:#fff;--ink:#18181b;--mute:#71717a;--faint:#a1a1aa;--line:#e7e5e4;--hover:#f4f4f5;--accent:#e4572e;--ok:#15803d;--warn:#b45309}
-@media (prefers-color-scheme:dark){:root{--bg:#0f0f10;--panel:#17171a;--ink:#f4f4f5;--mute:#a1a1aa;--faint:#63636b;--line:#26262b;--hover:#1f1f23;--accent:#ff7a50;--ok:#4ade80;--warn:#fbbf24}}
+:root{--bg:#fafaf9;--panel:#fff;--ink:#18181b;--mute:#71717a;--faint:#a1a1aa;--line:#e7e5e4;--hover:#f4f4f5;--accent:#e4572e;--ok:#15803d;--warn:#b45309;--cta:#16a34a;--cta-ink:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#0f0f10;--panel:#17171a;--ink:#f4f4f5;--mute:#a1a1aa;--faint:#63636b;--line:#26262b;--hover:#1f1f23;--accent:#ff7a50;--ok:#4ade80;--warn:#fbbf24;--cta:#22c55e;--cta-ink:#052e16}}
 *{box-sizing:border-box}
 html{-webkit-font-smoothing:antialiased}
 body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
@@ -39,7 +39,7 @@ h2 small,summary small{font-size:13px;color:var(--mute);font-weight:400}
 .compose:focus-within{border-color:var(--faint)}
 textarea{flex:1;min-width:0;height:34px;min-height:34px;max-height:160px;font:inherit;color:inherit;background:none;border:0;padding:6px 0;resize:none;outline:none}
 textarea::placeholder{color:var(--faint)}
-button.go{font:inherit;font-size:13.5px;font-weight:600;padding:7px 14px;border-radius:9px;border:0;background:var(--accent);color:#fff;cursor:pointer;white-space:nowrap}
+button.go{font:inherit;font-size:13.5px;font-weight:600;padding:7px 14px;border-radius:9px;border:0;background:var(--cta);color:var(--cta-ink);cursor:pointer;white-space:nowrap}
 button.go:hover{filter:brightness(1.06)}button.go:disabled{opacity:.5;cursor:default}
 .msg{font-size:12.5px;color:var(--mute);margin-top:8px;min-height:1em}
 .msg.warn{color:var(--warn)}.msg.ok{color:var(--ok)}.msg:empty{display:none}
@@ -65,6 +65,10 @@ button.go:hover{filter:brightness(1.06)}button.go:disabled{opacity:.5;cursor:def
 .sec h3{font-size:12px;color:var(--mute);margin:0 0 6px;font-weight:500}
 ul{margin:0;padding-left:17px;color:var(--ink)}li{margin:2px 0}
 .answers{color:var(--mute);white-space:pre-wrap;border-left:2px solid var(--line);padding-left:12px}
+details.chg{border:0;margin-top:20px;font-size:12.5px}
+details.chg summary{padding:6px 0;font-weight:400;color:var(--mute)}
+details.chg summary:hover{background:none;color:var(--ink)}
+details.chg ul{margin-top:4px}
 .older{margin-top:34px}
 .older>h3{font-size:12px;color:var(--mute);font-weight:500;margin:0 0 4px}
 details{border-top:1px solid var(--line)}
@@ -193,9 +197,12 @@ function init() {
 // swaps the page content in place, with no reload. Typed text is kept.
 function swap() {
   if (!fresh) return;
-  const open = [...document.querySelectorAll('details[open] summary')].map(x => x.dataset.n);
-  $('main').replaceWith(fresh.doc.querySelector('main'));
-  $('header').replaceWith(fresh.doc.querySelector('header'));
+  const open = [...document.querySelectorAll('.older details[open] > summary')].map(x => x.dataset.n);
+  // Set as HTML rather than moving nodes: a <video> parsed in a detached
+  // document never starts loading when it is moved into the page.
+  $('main').innerHTML = fresh.doc.querySelector('main').innerHTML;
+  $('header').innerHTML = fresh.doc.querySelector('header').innerHTML;
+  document.querySelectorAll('main video').forEach(v => v.load());
   open.forEach(n => { const d = document.querySelector('summary[data-n="' + n + '"]'); if (d) d.parentElement.open = true; });
   STAMP = fresh.stamp; fresh = null;
   $('#newv').hidden = true;
@@ -215,8 +222,8 @@ async function check() {
     // Same version, something else changed (for example a comment was
     // marked done): refresh the list quietly, leave the video alone.
     const a = doc.querySelector('#clist'), m = doc.querySelector('.v.latest .marks');
-    if (a) $('#clist').replaceWith(a);
-    if (m) document.querySelector('.v.latest .marks').replaceWith(m);
+    if (a) $('#clist').innerHTML = a.innerHTML;
+    if (m) document.querySelector('.v.latest .marks').innerHTML = m.innerHTML;
     STAMP = stamp; label();
   } else if (!mine) { location.reload(); }
 }
@@ -320,8 +327,10 @@ def write(ad_dir, tl):
         if v.get("answers"):
             body.append("<div class='sec'><h3>Your notes on version %d</h3>"
                         "<div class='answers'>%s</div></div>" % (v["n"] - 1, _e(v["answers"])))
-        body.append("<div class='sec'><h3>What changed</h3><ul>%s</ul></div>" % "".join(
-            "<li>%s</li>" % _e(c) for c in v["changes"]))
+        nch = len(v["changes"])
+        body.append("<details class='chg'><summary>What changed <small>%d change%s</small></summary>"
+                    "<ul>%s</ul></details>" % (nch, "" if nch == 1 else "s", "".join(
+                        "<li>%s</li>" % _e(c) for c in v["changes"])))
         card = "<section class='v%s'>%s<div>%s</div></section>" % (
             " latest" if newest else "",
             _video(files, "versions", v.get("feedback"), v.get("seconds", 1.0)), "".join(body))

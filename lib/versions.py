@@ -72,19 +72,27 @@ def diff(old, new):
         return ["First version"]
     ch = []
     so, sn = old.get("segments", []), new.get("segments", [])
-    for i in range(max(len(so), len(sn))):
-        if i >= len(so):
-            ch.append("Added segment %d: %s" % (i + 1, _seg_label(sn[i])))
-        elif i >= len(sn):
-            ch.append("Removed segment %d: %s" % (i + 1, _seg_label(so[i])))
-        elif _seg_label(so[i]) != _seg_label(sn[i]):
-            ch.append("Segment %d is now %s (was %s)" % (i + 1, _seg_label(sn[i]),
-                                                         _seg_label(so[i])))
-        else:
-            f = _fields(so[i], sn[i], ["in", "out", "dur", "speed", "volume",
-                                       "focus", "zoom", "fit", "captions"])
-            if f:
-                ch.append("Segment %d (%s): %s" % (i + 1, _seg_label(sn[i]), ", ".join(f)))
+    # Line the two cuts up by clip, so one inserted or removed shot is
+    # reported as exactly that instead of renumbering everything after it.
+    import difflib
+    la, lb = [_seg_label(x) for x in so], [_seg_label(x) for x in sn]
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, la, lb, autojunk=False).get_opcodes():
+        if op == "equal":
+            for k in range(i2 - i1):
+                f = _fields(so[i1 + k], sn[j1 + k], ["in", "out", "dur", "speed", "volume",
+                                                     "focus", "zoom", "fit", "captions"])
+                if f:
+                    ch.append("Segment %d (%s): %s" % (j1 + k + 1, lb[j1 + k], ", ".join(f)))
+            continue
+        gone, came = la[i1:i2], lb[j1:j2]
+        if op == "replace" and len(gone) == len(came):
+            for k in range(len(came)):
+                ch.append("Segment %d is now %s (was %s)" % (j1 + k + 1, came[k], gone[k]))
+            continue
+        for k, name in enumerate(came):
+            ch.append("Added %s as segment %d" % (name, j1 + k + 1))
+        for name in gone:
+            ch.append("Removed %s" % name)
     oo = dict((_ov_label(o), o) for o in old.get("overlays") or [])
     on = dict((_ov_label(o), o) for o in new.get("overlays") or [])
     gone = [k for k in oo if k not in on]
