@@ -138,6 +138,12 @@ if (box) {
   // The timecode follows the playhead until you start typing, then it holds.
   const show = () => { chip.textContent = fmt(at); };
   v.addEventListener('timeupdate', () => { if (!box.value.trim()) { at = v.currentTime; show(); } });
+  // A half-typed timecode comment keeps its moment across a reload.
+  try { const saved = parseFloat(localStorage.getItem(KEY + '-at'));
+    if ((localStorage.getItem(KEY) || '').trim() && !isNaN(saved)) { at = saved;
+      v.addEventListener('loadedmetadata', () => { v.currentTime = saved; }, {once: true});
+      if (v.readyState >= 1) v.currentTime = saved; } } catch (e) {}
+  box.addEventListener('input', () => { try { localStorage.setItem(KEY + '-at', at); } catch (e) {} });
   [[box, KEY], [boxw, KEY + '-whole']].forEach(([el, key]) => {
     try { el.value = localStorage.getItem(key) || ''; } catch (e) {}
     el.addEventListener('input', () => { if (el === box && el.value.trim()) v.pause();
@@ -247,8 +253,9 @@ def write(ad_dir, tl):
                 "<button class='tc' data-seek='%s'>%s</button>" % (f["t"], versions.tc(f["t"]))
                 if f.get("t") is not None else "<span class='tc gen'>Whole video</span>",
                 _e(f["text"]), f["status"],
-                "Done in version %d" % f["done_in"] if f["status"] == "done"
-                else label.get(f["status"], f["status"]),
+("Done in version %d" % f["done_in"] if f["status"] == "done"
+                 else label.get(f["status"], f["status"]))
+                + (" &middot; written on version %d" % f["from"] if f.get("from") else ""),
                 "<button class='del' data-at='%d' title='Delete'>&times;</button>" % f["at"]
                 if f["status"] == "open" and newest else "") for f in fbs)
         body = []

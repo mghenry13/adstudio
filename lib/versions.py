@@ -148,7 +148,7 @@ def snapshot(ad_dir, note=""):
         shutil.copyfile(r["file"], os.path.join(vdir(ad_dir), name))
         files[r["aspect"]] = name
     save_json(os.path.join(vdir(ad_dir), "v%d.json" % n), tl)
-    addressed = None
+    addressed, carried = None, []
     if prev:
         got = []
         for fb in prev.get("feedback", []):
@@ -156,9 +156,17 @@ def snapshot(ad_dir, note=""):
                 fb["status"], fb["done_in"] = "done", n
                 got.append(("%s  " % tc(fb["t"]) if fb.get("t") is not None else "") + fb["text"])
         addressed = "\n".join(got) or None
+        # Comments written but not yet sent must never be stranded on an old
+        # version: they move to the new one, still unsent, still editable.
+        carried = [f for f in prev.get("feedback", []) if f.get("status") in ("open", "note")]
+        prev["feedback"] = [f for f in prev.get("feedback", []) if f not in carried]
+        for f in carried:
+            f["status"] = "open"
+            f.setdefault("from", prev["n"])
     h["versions"].append({"n": n, "at": int(time.time()), "note": note,
                           "seconds": results[0]["secs"], "files": files,
-                          "changes": changes, "answers": addressed, "feedback": []})
+                          "changes": changes, "answers": addressed,
+                          "feedback": carried if prev else []})
     _save(ad_dir, h)
     render.write_preview_page(ad_dir, tl)
     out("saved v%d of %s" % (n, rel(ad_dir)))
