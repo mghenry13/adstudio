@@ -88,8 +88,12 @@ and presses Redo. Keep this loop running whenever an ad is being reviewed:
    Comments pinned to a moment arrive as
    `FEEDBACK on v6 at 0:07.4 [segment 3 (index 2, clip ...), 1.20s into it, source time 14.30s]: text`.
    Use that to find the exact segment, overlay or caption the comment is about.
-4. Apply the feedback to `timeline.json`, `snapshot` again (this marks the
-   feedback done and shows it on the new version), then `wait` again.
+4. Run `adstudio todo <brand>/<ad>` and handle EVERY comment it lists, one by
+   one (timecoded and whole-video). Then `snapshot --done <numbers>` naming only
+   the comments the new version really answers; anything not done stays waiting
+   and shows on the next version. Re-run `todo` afterwards: it must be empty, or
+   you tell the user in chat which comment is left and why. Then `wait` again.
+   Never use `--done all` without having checked each item.
    Do exactly what was asked; if something is unclear or cannot be done,
    say so in chat and put it in `--note` rather than guessing.
 If no chat is waiting when the user presses Redo, the server starts Claude

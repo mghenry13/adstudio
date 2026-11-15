@@ -43,7 +43,10 @@ HELP = """adstudio commands
 
   Versions and feedback
     serve [port]                  preview server (pages, feedback box, Redo button)
-    snapshot <brand>/<ad> [--note ..]  keep the current draft as the next version
+    todo <brand>/<ad>             comments sent with Redo that are not done yet
+    snapshot <brand>/<ad> [--note ..] [--done 1,2|all]
+                                  keep the draft as the next version; --done names the
+                                  comments it answers (refuses while any are unaccounted)
     history <brand>/<ad>          versions, what changed, feedback
     feedback <brand>/<ad> <n> "text"   add feedback from chat instead of the page
     wait <brand>/<ad>             block until the page sends feedback with Redo
@@ -258,8 +261,22 @@ def cmd_snapshot(a):
     p = argparse.ArgumentParser(prog="adstudio snapshot")
     p.add_argument("ad")
     p.add_argument("--note", default="")
+    p.add_argument("--done", default=None,
+                   help="numbers from `adstudio todo` that this version answers, or all")
     o = p.parse_args(a)
-    versions.snapshot(_ad_dir(o.ad), o.note)
+    versions.snapshot(_ad_dir(o.ad), o.note, o.done)
+
+
+def cmd_todo(a):
+    """Every comment sent with Redo that no version has answered yet."""
+    from . import versions
+    if not a:
+        raise Fail("usage: adstudio todo <brand>/<ad>")
+    left = versions.waiting_comments(_ad_dir(a[0]))
+    if not left:
+        out("no comments waiting")
+    for i, f in enumerate(left):
+        out("%d. %s" % (i + 1, versions._label(f)))
 
 
 def cmd_feedback(a):
@@ -512,7 +529,7 @@ def cmd_prune(a):
     out("removed %d cached render files" % n)
 
 
-COMMANDS = {"voice": cmd_voice, "ingest": cmd_ingest, "clips": cmd_clips, "clip": cmd_clip,
+COMMANDS = {"todo": cmd_todo, "voice": cmd_voice, "ingest": cmd_ingest, "clips": cmd_clips, "clip": cmd_clip,
             "sheet": cmd_sheet, "frame": cmd_frame,
             "transcribe": cmd_transcribe, "analyze": cmd_analyze,
             "shots": cmd_shots, "search": cmd_search, "new": cmd_new,

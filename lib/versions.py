@@ -129,8 +129,41 @@ def diff(old, new):
     return ch or ["No changes to the edit"]
 
 
-def snapshot(ad_dir, note=""):
-    """Keep the current drafts as the next version."""
+def waiting_comments(ad_dir):
+    """Comments sent with Redo that no version has answered yet (the real records)."""
+    res = []
+    for v in history(ad_dir)["versions"]:
+        for fb in v.get("feedback", []):
+            if fb.get("status") == "requested":
+                res.append(fb)
+    return res
+
+
+def _label(fb):
+    return ("%s  " % tc(fb["t"]) if fb.get("t") is not None else "Whole video  ") + fb["text"]
+
+
+def snapshot(ad_dir, note="", done=None):
+    """Keep the current drafts as the next version.
+
+    Every comment sent with Redo has to be accounted for: `done` lists the
+    numbers (from `adstudio todo`) this version answers, or "all". Anything
+    not listed stays waiting and moves to the new version, so a comment can
+    never be marked done just because a version was saved."""
+    waiting = waiting_comments(ad_dir)
+    if waiting and done is None:
+        raise Fail("%d comment%s waiting. Say which ones this version answers with "
+                   "--done 1,2 (or --done all), then re-run:\n%s" % (
+                       len(waiting), "s" if len(waiting) > 1 else "",
+                       "\n".join("  %d. %s" % (i + 1, _label(f)) for i, f in enumerate(waiting))))
+    if done == "all":
+        done_set = set(range(1, len(waiting) + 1))
+    else:
+        done_set = set(int(x) for x in str(done or "").split(",") if x.strip())
+        bad = [x for x in done_set if not 1 <= x <= len(waiting)]
+        if bad:
+            raise Fail("no waiting comment numbered %s (there are %d)" % (bad, len(waiting)))
+    answered = set((waiting[i - 1].get("at"), waiting[i - 1]["text"]) for i in done_set)
     from . import render
     tl = T.load(ad_dir)
     h = history(ad_dir)
@@ -151,10 +184,11 @@ def snapshot(ad_dir, note=""):
     addressed, carried = None, []
     if prev:
         got = []
-        for fb in prev.get("feedback", []):
-            if fb.get("status") == "requested":
-                fb["status"], fb["done_in"] = "done", n
-                got.append(("%s  " % tc(fb["t"]) if fb.get("t") is not None else "") + fb["text"])
+        for v in h["versions"]:
+            for fb in v.get("feedback", []):
+                if fb.get("status") == "requested" and (fb.get("at"), fb["text"]) in answered:
+                    fb["status"], fb["done_in"] = "done", n
+                    got.append(_label(fb))
         addressed = "\n".join(got) or None
         # Comments written but not yet sent must never be stranded on an old
         # version: they move to the new one, still unsent, still editable.
@@ -172,6 +206,11 @@ def snapshot(ad_dir, note=""):
     out("saved v%d of %s" % (n, rel(ad_dir)))
     for c in changes:
         out("  - " + c)
+    left = waiting_comments(ad_dir)
+    if left:
+        out("STILL WAITING (%d), not done yet:" % len(left))
+        for i, f in enumerate(left):
+            out("  %d. %s" % (i + 1, _label(f)))
     return n
 
 
