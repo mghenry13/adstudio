@@ -188,14 +188,16 @@ def add_feedback(ad_dir, n, text, redo=True, t=None, delete=None):
         if t is not None:
             fb["t"] = round(max(0.0, min(float(t), v.get("seconds", 1e9))), 2)
         fbs.append(fb)
+        v["_added"] = fb["at"]
     if redo:
         for f in fbs:
             if f["status"] in ("open", "note"):
                 f["status"] = "requested"
+    added = v.pop("_added", None)
     _save(ad_dir, h)
     from . import render
     render.write_preview_page(ad_dir, T.load(ad_dir))
-    return v
+    return added
 
 
 def pending(ad_dir):

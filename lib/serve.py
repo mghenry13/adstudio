@@ -139,12 +139,13 @@ class Handler(SimpleHTTPRequestHandler):
                 raise Fail("comment is empty")
             ad = ad_dir_for(d.get("ad"))
             t = d.get("t")
-            versions.add_feedback(ad, int(d.get("version")), text, redo=redo,
-                                  t=float(t) if t is not None else None,
-                                  delete=int(delete) if delete is not None else None)
+            added = versions.add_feedback(
+                ad, int(d.get("version")), text, redo=redo,
+                t=float(t) if t is not None else None,
+                delete=int(delete) if delete is not None else None)
             if redo and not versions.pending(ad):
                 raise Fail("add a comment first")
-            return self._json(200, state(ad))
+            return self._json(200, dict(state(ad), added=added))
         except (Fail, ValueError, TypeError) as e:
             return self._json(400, {"error": str(e)})
 

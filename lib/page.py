@@ -12,55 +12,72 @@ import time
 from . import versions
 
 CSS = """
-:root{--bg:#f4f1ec;--card:#fff;--ink:#16181b;--mute:#6b7076;--line:#e2ddd5;--accent:#c8501e;--ok:#2f7d4f;--warn:#9a6a00}
-@media (prefers-color-scheme:dark){:root{--bg:#131517;--card:#1c1f22;--ink:#e8e6e1;--mute:#8e949a;--line:#2b2f33;--accent:#f0794a;--ok:#5fbf86;--warn:#e0b050}}
+:root{--bg:#fafaf9;--panel:#fff;--ink:#18181b;--mute:#71717a;--faint:#a1a1aa;--line:#e7e5e4;--hover:#f4f4f5;--accent:#e4572e;--ok:#15803d;--warn:#b45309}
+@media (prefers-color-scheme:dark){:root{--bg:#0f0f10;--panel:#17171a;--ink:#f4f4f5;--mute:#a1a1aa;--faint:#63636b;--line:#26262b;--hover:#1f1f23;--accent:#ff7a50;--ok:#4ade80;--warn:#fbbf24}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-header{padding:22px 24px 6px;max-width:1100px;margin:0 auto}
-h1{font-size:20px;margin:0 0 2px;font-weight:650}
-.sub{color:var(--mute);font-size:13px}
-main{max-width:1100px;margin:0 auto;padding:12px 24px 60px;display:flex;flex-direction:column;gap:18px}
-.v{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:22px}
-.v.old{opacity:.92}
-@media (max-width:720px){.v{grid-template-columns:1fr}header,main{padding-left:16px;padding-right:16px}}
-video{width:100%;border-radius:10px;background:#000;display:block;max-height:70vh}
-.tabs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
-.tabs button{font:inherit;font-size:12px;padding:3px 10px;border-radius:99px;border:1px solid var(--line);background:none;color:var(--mute);cursor:pointer}
-.tabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-h2{font-size:17px;margin:0;font-weight:650;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
-h2 small{font-size:12.5px;color:var(--mute);font-weight:400}
-h3{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);margin:16px 0 6px;font-weight:600}
-ul{margin:0;padding-left:18px}li{margin:3px 0}
-.answers{border-left:3px solid var(--accent);padding:2px 0 2px 12px;margin-top:12px;color:var(--mute);white-space:pre-wrap}
-.fb{border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:6px 0;white-space:pre-wrap}
-.fb{display:flex;gap:10px;align-items:flex-start}
+html{-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--ink);font:14.5px/1.5 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif}
+header{max-width:1120px;margin:0 auto;padding:26px 28px 18px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;flex-wrap:wrap}
+h1{font-size:19px;margin:0;font-weight:600;letter-spacing:-.01em}
+.sub{color:var(--mute);font-size:13px;margin-left:10px;font-weight:400}
+.finals{font-size:13px;color:var(--mute);display:flex;gap:14px}
+.finals a{color:var(--mute);text-decoration:none;border-bottom:1px solid var(--line)}
+.finals a:hover{color:var(--ink)}
+main{max-width:1120px;margin:0 auto;padding:0 28px 80px}
+.v{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:36px;align-items:start}
+.v.latest{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}
+@media (max-width:760px){.v{grid-template-columns:1fr;gap:20px}header,main{padding-left:16px;padding-right:16px}}
+video{width:100%;border-radius:12px;background:#000;display:block;max-height:76vh}
+.tabs{display:flex;gap:4px;margin-top:10px}
+.tabs button{font:inherit;font-size:12px;padding:3px 10px;border-radius:7px;border:0;background:none;color:var(--mute);cursor:pointer}
+.tabs button:hover{background:var(--hover)}
+.tabs button.on{background:var(--hover);color:var(--ink);font-weight:500}
+h2{font-size:16px;margin:0;font-weight:600;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;letter-spacing:-.01em}
+h2 small,summary small{font-size:13px;color:var(--mute);font-weight:400}
+.note{color:var(--mute);margin-top:4px}
+.compose{display:flex;gap:10px;align-items:center;margin-top:18px;padding:6px 6px 6px 10px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.compose:focus-within{border-color:var(--faint)}
+textarea{flex:1;min-width:0;height:34px;min-height:34px;max-height:160px;font:inherit;color:inherit;background:none;border:0;padding:6px 0;resize:none;outline:none}
+textarea::placeholder{color:var(--faint)}
+button.go{font:inherit;font-size:13.5px;font-weight:600;padding:7px 14px;border-radius:9px;border:0;background:var(--accent);color:#fff;cursor:pointer;white-space:nowrap}
+button.go:hover{filter:brightness(1.06)}button.go:disabled{opacity:.5;cursor:default}
+.msg{font-size:12.5px;color:var(--mute);margin-top:8px;min-height:1em}
+.msg.warn{color:var(--warn)}.msg.ok{color:var(--ok)}.msg:empty{display:none}
+.tc{font:500 12px ui-monospace,SFMono-Regular,Menlo,monospace;padding:3px 7px;border-radius:6px;border:0;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);cursor:pointer;white-space:nowrap}
+.tc:hover{background:color-mix(in srgb,var(--accent) 24%,transparent)}
+.tc.off,.tc.gen{background:var(--hover);color:var(--mute)}
+.tc.gen{cursor:default}
+#clist,.clist{margin-top:14px}
+.fb{display:flex;gap:12px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line);white-space:pre-wrap}
 .fb .x{flex:1;min-width:0}
-.tc{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;padding:2px 7px;border-radius:6px;border:0;background:var(--accent);color:#fff;cursor:pointer;white-space:nowrap}
-.tc.off{background:none;color:var(--mute);border:1px dashed var(--line)}
-.tc.gen{background:color-mix(in srgb,var(--ink) 10%,transparent);color:var(--mute);cursor:default}
-.del{border:0;background:none;color:var(--mute);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px}
-.marks{position:relative;height:14px;margin-top:6px;border-radius:7px;background:color-mix(in srgb,var(--ink) 9%,transparent);cursor:pointer}
-.marks i{position:absolute;top:2px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--accent);border:2px solid var(--card)}
-.marks i.done{background:var(--ok)}
-.marks b{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);opacity:.55}
-.compose{display:flex;gap:8px;align-items:flex-start}
-.compose textarea{min-height:44px;height:44px}
-.fb .st{display:block;font-size:12px;margin-top:4px;color:var(--mute)}
+.fb .st{display:block;font-size:12px;margin-top:2px;color:var(--faint)}
 .fb .st.requested{color:var(--warn)}.fb .st.done{color:var(--ok)}
-textarea{width:100%;min-height:92px;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical}
-textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
-.row{display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap}
-button.go{font:inherit;font-weight:600;padding:9px 18px;border-radius:99px;border:0;background:var(--accent);color:#fff;cursor:pointer}
-button.go:disabled{opacity:.5;cursor:default}
-.msg{font-size:13px;color:var(--mute)}
-.msg.warn{color:var(--warn)}.msg.ok{color:var(--ok)}
-.note{color:var(--mute);margin-top:6px}
-.empty{background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:22px;color:var(--mute)}
-.finals{font-size:13px;color:var(--mute)}.finals a{color:inherit}
+.del{border:0;background:none;color:var(--faint);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;border-radius:5px;opacity:0}
+.fb:hover .del{opacity:1}.del:hover{color:var(--ink);background:var(--hover)}
+.marks{position:relative;height:12px;margin:8px 16px 0}
+.marks:empty{display:none}
+.marks i{position:absolute;top:1px;width:9px;height:9px;margin-left:-4.5px;border-radius:50%;background:var(--accent);cursor:pointer}
+.marks i.done{background:var(--ok)}
+.sec{margin-top:20px;font-size:13.5px}
+.sec h3{font-size:12px;color:var(--mute);margin:0 0 6px;font-weight:500}
+ul{margin:0;padding-left:17px;color:var(--ink)}li{margin:2px 0}
+.answers{color:var(--mute);white-space:pre-wrap;border-left:2px solid var(--line);padding-left:12px}
+.older{margin-top:34px}
+.older>h3{font-size:12px;color:var(--mute);font-weight:500;margin:0 0 4px}
+details{border-top:1px solid var(--line)}
+details:last-child{border-bottom:1px solid var(--line)}
+summary{list-style:none;cursor:pointer;padding:13px 4px;display:flex;gap:12px;align-items:baseline;font-weight:500}
+summary::-webkit-details-marker{display:none}
+summary:hover{background:var(--hover)}
+summary::before{content:"\\203A";color:var(--faint);display:inline-block;width:10px;transition:transform .15s}
+details[open] summary::before{transform:rotate(90deg)}
+details .v{padding:8px 4px 26px}
+.empty{background:var(--panel);border:1px dashed var(--line);border-radius:16px;padding:24px;color:var(--mute)}
+code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace}
 """
 
 JS = """
-const AD = %(ad)s, STAMP = %(stamp)d;
+const AD = %(ad)s; let STAMP = %(stamp)d;
 const $ = (s, r=document) => r.querySelector(s);
 document.querySelectorAll('.tabs').forEach(t => t.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -76,20 +93,41 @@ const vidOf = el => el.closest('.v').querySelector('video');
 document.addEventListener('click', e => {
   const s = e.target.closest('[data-seek]');
   if (s) { const v = vidOf(s); v.currentTime = +s.dataset.seek; v.pause(); return; }
-  const m = e.target.closest('.marks');
-  if (m) { const v = vidOf(m), r = m.getBoundingClientRect();
-    if (v.duration) v.currentTime = (e.clientX - r.left) / r.width * v.duration; }
 });
 document.querySelectorAll('.v').forEach(card => {
   const v = card.querySelector('video'), head = card.querySelector('.marks b');
   if (v && head) v.addEventListener('timeupdate', () => { if (v.duration) head.style.left = (v.currentTime / v.duration * 100) + '%%'; });
 });
+// Comments are added, deleted and sent in place. The page only reloads when
+// a new version arrives, so the video never loses its position.
 async function post(body) {
   const r = await fetch('/api/feedback', {method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(Object.assign({ad: AD, version: +go.dataset.v}, body))});
-  if (!r.ok) throw new Error((await r.json()).error || r.status);
-  try { localStorage.removeItem(KEY); } catch (e) {}
-  location.reload();
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || r.status);
+  STAMP = d.stamp;
+  return d;
+}
+function label() {
+  const n = document.querySelectorAll('#clist .st.open').length;
+  go.textContent = 'Redo' + (n ? ' with ' + n + ' comment' + (n === 1 ? '' : 's') : '');
+}
+function addRow(text, t, id) {
+  const row = document.createElement('div'); row.className = 'fb'; row.dataset.t = t === null ? 1e9 : t;
+  const tc = document.createElement(t === null ? 'span' : 'button');
+  tc.className = 'tc' + (t === null ? ' gen' : ''); tc.textContent = t === null ? 'General' : fmt(t);
+  if (t !== null) tc.dataset.seek = t;
+  const x = document.createElement('div'); x.className = 'x'; x.textContent = text;
+  const st = document.createElement('span'); st.className = 'st open'; st.textContent = 'Not sent yet';
+  x.appendChild(st);
+  const del = document.createElement('button'); del.className = 'del'; del.dataset.at = id; del.title = 'Delete'; del.textContent = '\u00d7';
+  row.append(tc, x, del);
+  const list = $('#clist'), after = [...list.children].find(c => +c.dataset.t > +row.dataset.t);
+  list.insertBefore(row, after || null);
+  if (t !== null) { const v = vidOf(box), m = document.createElement('i');
+    m.style.left = (t / (v.duration || 1) * 100) + '%%'; m.dataset.seek = t; m.dataset.at = id; m.title = text;
+    box.closest('.v').querySelector('.marks').appendChild(m); }
+  label();
 }
 if (box) {
   const v = vidOf(box);
@@ -104,20 +142,35 @@ if (box) {
   const send = async redo => {
     const text = box.value.trim();
     if (!text && !redo) return;
-    go.disabled = true; say('Sending...');
-    try { await post({text, t: text && pinned ? at : null, redo}); }
-    catch (e) { go.disabled = false;
+    go.disabled = true;
+    try {
+      const t = text && pinned ? Math.round(at * 100) / 100 : null;
+      const d = await post({text, t, redo});
+      if (text) addRow(text, t, d.added);
+      box.value = ''; try { localStorage.removeItem(KEY); } catch (e) {}
+      if (redo) { document.querySelectorAll('#clist .st.open').forEach(s => { s.className = 'st requested'; s.textContent = 'Sent to Claude'; });
+        document.querySelectorAll('#clist .del').forEach(d => d.remove()); label(); }
+      say('');
+      at = v.currentTime; show();
+    } catch (e) {
       say(e.message === 'add a comment first' ? 'Add a comment first.'
-          : 'Could not send. Is the preview server running? (adstudio serve) ' + e.message, 'warn'); }
+          : 'Could not send. Is the preview server running? (adstudio serve) ' + e.message, 'warn');
+    }
+    go.disabled = false;
   };
   box.addEventListener('keydown', e => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(true); }
     else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(false); }
   });
   go.addEventListener('click', () => send(true));
-  document.querySelectorAll('.del').forEach(d => d.addEventListener('click', () =>
-    post({text: '', redo: false, delete: +d.dataset.at}).catch(e => say(e.message, 'warn'))));
-  show();
+  document.addEventListener('click', async e => {
+    const d = e.target.closest('.del'); if (!d) return;
+    try { await post({text: '', redo: false, delete: +d.dataset.at});
+      const m = document.querySelector('.marks i[data-at="' + d.dataset.at + '"]'); if (m) m.remove();
+      d.closest('.fb').remove(); label();
+    } catch (err) { say(err.message, 'warn'); }
+  });
+  show(); label();
 }
 function say(t, cls) { if (msg) { msg.textContent = t; msg.className = 'msg ' + (cls || ''); } }
 async function poll() {
@@ -157,12 +210,12 @@ def _video(files, base, feedback=None, seconds=1.0):
             "<button class='%s' data-src='%s'>%s</button>" % ("on" if i == 0 else "", src(k), k)
             for i, k in enumerate(keys))
     marks = "".join(
-        "<i class='%s' style='left:%.2f%%' data-seek='%s' title='%s'></i>" % (
+        "<i class='%s' style='left:%.2f%%' data-seek='%s' data-at='%s' title='%s'></i>" % (
             "done" if f.get("status") == "done" else "", 100.0 * f["t"] / max(seconds, 0.1),
-            f["t"], _e(f["text"]))
+            f["t"], f["at"], _e(f["text"]))
         for f in (feedback or []) if f.get("t") is not None)
     return ("<div><video src='%s' controls loop playsinline preload='metadata'></video>"
-            "<div class='marks' title='Comments on the timeline'><b></b>%s</div>%s</div>") % (
+            "<div class='marks' title='Comments on the timeline'>%s</div>%s</div>") % (
         src(keys[0]), marks, tabs)
 
 
@@ -171,47 +224,64 @@ def write(ad_dir, tl):
     ad_ref = "%s/%s" % (tl.get("brand", ""), os.path.basename(ad_dir))
     h = versions.history(ad_dir)["versions"]
     cards = []
+    older = []
     for i, v in enumerate(reversed(h)):
         newest = i == 0
         stamp = "?t=%d" % v["at"]
         files = dict((k, f + stamp) for k, f in v["files"].items())
-        body = ["<h2>Version %d <small>%s &middot; %.1fs%s</small></h2>" % (
-            v["n"], _when(v["at"]), v["seconds"], " &middot; latest" if newest else "")]
-        if v.get("note"):
-            body.append("<div class='note'>%s</div>" % _e(v["note"]))
-        if v.get("answers"):
-            body.append("<h3>Your feedback on version %d</h3><div class='answers'>%s</div>"
-                        % (v["n"] - 1, _e(v["answers"])))
-        body.append("<h3>What changed</h3><ul>%s</ul>" % "".join(
-            "<li>%s</li>" % _e(c) for c in v["changes"]))
         fbs = sorted(v.get("feedback", []),
                      key=lambda f: (f.get("t") is None, f.get("t") or 0, f["at"]))
-        if fbs:
-            label = {"requested": "Sent to Claude", "note": "Note", "open": "Not sent yet"}
-            body.append("<h3>Comments</h3>" + "".join(
-                "<div class='fb'>%s<div class='x'>%s<span class='st %s'>%s &middot; %s</span></div>%s</div>" % (
-                    "<button class='tc' data-seek='%s'>%s</button>" % (f["t"], versions.tc(f["t"]))
-                    if f.get("t") is not None else "<span class='tc gen'>General</span>",
-                    _e(f["text"]), f["status"],
-                    "Done in version %d" % f["done_in"] if f["status"] == "done"
-                    else label.get(f["status"], f["status"]), _when(f["at"]),
-                    "<button class='del' data-at='%d' title='Delete'>&times;</button>" % f["at"]
-                    if f["status"] == "open" and newest else "") for f in fbs))
+        label = {"requested": "Sent to Claude", "note": "Note", "open": "Not sent yet"}
+        rows = "".join(
+            "<div class='fb' data-t='%s'>%s<div class='x'>%s<span class='st %s'>%s</span></div>%s</div>" % (
+                f["t"] if f.get("t") is not None else 1e9,
+                "<button class='tc' data-seek='%s'>%s</button>" % (f["t"], versions.tc(f["t"]))
+                if f.get("t") is not None else "<span class='tc gen'>General</span>",
+                _e(f["text"]), f["status"],
+                "Done in version %d" % f["done_in"] if f["status"] == "done"
+                else label.get(f["status"], f["status"]),
+                "<button class='del' data-at='%d' title='Delete'>&times;</button>" % f["at"]
+                if f["status"] == "open" and newest else "") for f in fbs)
+        body = []
         if newest:
             n_open = sum(1 for f in fbs if f["status"] == "open")
+            body.append("<h2>Version %d <small>%s &middot; %.1fs</small></h2>" % (
+                v["n"], _when(v["at"]), v["seconds"]))
+            if v.get("note"):
+                body.append("<div class='note'>%s</div>" % _e(v["note"]))
             body.append(
-                "<h3>Add a comment</h3>"
-                "<div class='compose'><button class='tc' id='tc' title='Click to switch between "
-                "this moment and a general comment'>0:00.0</button>"
-                "<textarea id='fb' placeholder='Pause where something is wrong and type. "
-                "Enter adds the comment.'></textarea></div>"
-                "<div class='row'><button class='go' id='go' data-v='%d'>Redo%s</button>"
-                "<span class='msg' id='msg'>Enter adds a comment. Redo sends them all to Claude.</span></div>"
-                "<div class='msg' id='working' style='margin-top:8px'></div>" % (
-                    v["n"], " with %d comment%s" % (n_open, "" if n_open == 1 else "s") if n_open else ""))
-        cards.append("<section class='v%s'>%s<div>%s</div></section>" % (
-            "" if newest else " old",
-            _video(files, "versions", v.get("feedback"), v.get("seconds", 1.0)), "".join(body)))
+                "<div class='compose'><button class='tc' id='tc' title='Pinned to this moment. "
+                "Click for a general comment.'>0:00.0</button>"
+                "<textarea id='fb' rows='1' placeholder='Comment at this moment, then Enter'></textarea>"
+                "<button class='go' id='go' data-v='%d' title='Send all comments to Claude "
+                "(Cmd+Enter)'>Redo%s</button></div>"
+                "<div class='msg' id='msg'></div><div class='msg' id='working'></div>"
+                "<span id='chead' hidden></span><div id='clist'>%s</div>" % (
+                    v["n"], " with %d comment%s" % (n_open, "" if n_open == 1 else "s")
+                    if n_open else "", rows))
+        elif v.get("note"):
+            body.append("<div class='note'>%s</div>" % _e(v["note"]))
+        if not newest and rows:
+            body.append("<div class='clist'>%s</div>" % rows)
+        if v.get("answers"):
+            body.append("<div class='sec'><h3>Your notes on version %d</h3>"
+                        "<div class='answers'>%s</div></div>" % (v["n"] - 1, _e(v["answers"])))
+        body.append("<div class='sec'><h3>What changed</h3><ul>%s</ul></div>" % "".join(
+            "<li>%s</li>" % _e(c) for c in v["changes"]))
+        card = "<section class='v%s'>%s<div>%s</div></section>" % (
+            " latest" if newest else "",
+            _video(files, "versions", v.get("feedback"), v.get("seconds", 1.0)), "".join(body))
+        if newest:
+            cards.append(card)
+        else:
+            nc, nf = len(v["changes"]), len(fbs)
+            older.append("<details><summary>Version %d <small>%s &middot; %d change%s%s</small>"
+                         "</summary>%s</details>" % (
+                             v["n"], _when(v["at"]), nc, "" if nc == 1 else "s",
+                             " &middot; %d comment%s" % (nf, "" if nf == 1 else "s") if nf else "",
+                             card))
+    if older:
+        cards.append("<div class='older'><h3>Earlier versions</h3>%s</div>" % "".join(older))
     if not cards:
         drafts = []
         d = os.path.join(ad_dir, "previews")
@@ -230,13 +300,15 @@ def write(ad_dir, tl):
     if os.path.isdir(d):
         fl = [n for n in sorted(os.listdir(d)) if n.endswith((".mp4", ".xml"))]
         if fl:
-            finals = "<div class='finals'>Finals: %s</div>" % " &middot; ".join(
-                "<a href='exports/%s'>%s</a>" % (n, n) for n in fl)
+            finals = "<div class='finals'>%s</div>" % "".join(
+                "<a href='exports/%s' title='%s'>%s</a>" % (
+                    n, n, "Premiere XML" if n.endswith(".xml") else "Final " + n.rsplit("-", 1)[-1][:-4])
+                for n in fl)
     hist = os.path.join(ad_dir, "versions", "history.json")
     page = ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
             "<title>%s &middot; adstudio versions</title><style>%s</style></head><body>"
-            "<header><h1>%s</h1><div class='sub'>%s &middot; %d version%s</div>%s</header>"
+            "<header><h1>%s<span class='sub'>%s &middot; %d version%s</span></h1>%s</header>"
             "<main>%s</main><script>%s</script></body></html>") % (
         _e(name), CSS, _e(name), _e(tl.get("brand", "")), len(h),
         "" if len(h) == 1 else "s", finals, "".join(cards),
@@ -249,5 +321,5 @@ def write(ad_dir, tl):
     stamp = int(max(os.path.getmtime(dst),
                     os.path.getmtime(hist) if os.path.exists(hist) else 0) * 1000)
     with open(dst, "w") as f:
-        f.write(page.replace("STAMP = 0;", "STAMP = %d;" % stamp))
+        f.write(page.replace("let STAMP = 0;", "let STAMP = %d;" % stamp))
     os.utime(dst, (stamp / 1000.0, stamp / 1000.0))
