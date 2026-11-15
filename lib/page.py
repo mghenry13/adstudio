@@ -67,6 +67,12 @@ button.go:hover{filter:brightness(1.06)}button.go:disabled{opacity:.5;cursor:def
 .sec h3{font-size:12px;color:var(--mute);margin:0 0 6px;font-weight:500}
 ul{margin:0;padding-left:17px;color:var(--ink)}li{margin:2px 0}
 .answers{color:var(--mute);white-space:pre-wrap;border-left:2px solid var(--line);padding-left:12px}
+.jumps{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:18px;font-size:12.5px;color:var(--mute)}
+.jumps span{margin-right:4px}
+.tc.chgt{background:color-mix(in srgb,var(--cta) 16%,transparent);color:var(--cta)}
+.tc.chgt:hover{background:color-mix(in srgb,var(--cta) 28%,transparent)}
+details.chg li{list-style:none;margin:6px 0}
+details.chg ul{padding-left:0}
 details.chg{border:0;margin-top:20px;font-size:12.5px}
 details.chg summary{padding:6px 0;font-weight:400;color:var(--mute)}
 details.chg summary:hover{background:none;color:var(--ink)}
@@ -307,9 +313,24 @@ def write(ad_dir, tl):
             body.append("<div class='sec'><h3>Your notes on version %d</h3>"
                         "<div class='answers'>%s</div></div>" % (v["n"] - 1, _e(v["answers"])))
         nch = len(v["changes"])
+        cts = list(v.get("change_times") or []) + [None] * nch
+        # Jump chips: one per distinct moment that changed, in order.
+        seen, jumps = set(), []
+        for c, t in sorted(zip(v["changes"], cts), key=lambda x: (x[1] is None, x[1] or 0)):
+            if t is None or round(t, 1) in seen:
+                continue
+            seen.add(round(t, 1))
+            here = [x for x, y in zip(v["changes"], cts) if y is not None and round(y, 1) == round(t, 1)]
+            jumps.append("<button class='tc chgt' data-seek='%s' title='%s'>%s</button>" % (
+                t, _e("\n".join(here)), versions.tc(t)))
+        if jumps:
+            body.append("<div class='jumps'><span>Jump to changes</span>%s</div>" % "".join(jumps))
         body.append("<details class='chg'><summary>What changed <small>%d change%s</small></summary>"
                     "<ul>%s</ul></details>" % (nch, "" if nch == 1 else "s", "".join(
-                        "<li>%s</li>" % _e(c) for c in v["changes"])))
+                        "<li>%s%s</li>" % (
+                            "<button class='tc chgt' data-seek='%s'>%s</button> " % (t, versions.tc(t))
+                            if t is not None else "", _e(c))
+                        for c, t in zip(v["changes"], cts))))
         card = "<section class='v%s'>%s<div>%s</div></section>" % (
             " latest" if newest else "",
             _video(files, "versions", v.get("feedback"), v.get("seconds", 1.0)), "".join(body))

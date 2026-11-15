@@ -66,12 +66,48 @@ def _fmt(v):
     return str(v).replace("\n", " ")
 
 
+class Change(str):
+    """A change-list line that also knows where in the new video to look."""
+    t = None
+
+
+def _c(text, t=None):
+    c = Change(text)
+    c.t = None if t is None else round(max(0.0, float(t)), 2)
+    return c
+
+
+def _starts(tl):
+    """Start time of every segment, plus the total at the end."""
+    fps, pos, res = float(tl.get("fps", 30)), 0.0, []
+    for s in tl.get("segments", []):
+        res.append(pos)
+        if "clip" in s and "in" in s and "out" in s:
+            d = (float(s["out"]) - float(s["in"])) / float(s.get("speed", 1) or 1)
+        else:
+            d = float(s.get("dur", 2.0))
+        pos += max(1, round(d * fps)) / fps
+    return res + [pos]
+
+
+def _ov_time(o, starts):
+    try:
+        base = starts[int(o["seg"])] if "seg" in o else 0.0
+        return base + float(o.get("start", 0) or 0)
+    except (IndexError, ValueError, TypeError):
+        return None
+
+
 def diff(old, new):
-    """Plain-language list of differences between two timelines."""
+    """Plain-language list of differences between two timelines. Each line
+    carries `.t`, the moment in the new video where the change can be seen
+    (None for changes that are not at one moment, like music level)."""
     if not old:
-        return ["First version"]
+        return [_c("First version")]
     ch = []
     so, sn = old.get("segments", []), new.get("segments", [])
+    st_old, st = _starts(old), _starts(new)
+    at = lambda j: st[min(j, len(st) - 1)]
     # Line the two cuts up by clip, so one inserted or removed shot is
     # reported as exactly that instead of renumbering everything after it.
     import difflib
@@ -82,17 +118,20 @@ def diff(old, new):
                 f = _fields(so[i1 + k], sn[j1 + k], ["in", "out", "dur", "speed", "volume",
                                                      "focus", "zoom", "fit", "captions"])
                 if f:
-                    ch.append("Segment %d (%s): %s" % (j1 + k + 1, lb[j1 + k], ", ".join(f)))
+                    ch.append(_c("Segment %d (%s): %s" % (j1 + k + 1, lb[j1 + k], ", ".join(f)),
+                                 at(j1 + k)))
             continue
         gone, came = la[i1:i2], lb[j1:j2]
         if op == "replace" and len(gone) == len(came):
             for k in range(len(came)):
-                ch.append("Segment %d is now %s (was %s)" % (j1 + k + 1, came[k], gone[k]))
+                ch.append(_c("Segment %d is now %s (was %s)" % (j1 + k + 1, came[k], gone[k]),
+                             at(j1 + k)))
             continue
         for k, name in enumerate(came):
-            ch.append("Added %s as segment %d" % (name, j1 + k + 1))
+            ch.append(_c("Added %s as segment %d" % (name, j1 + k + 1), at(j1 + k)))
         for name in gone:
-            ch.append("Removed %s" % name)
+            # Point at the cut where the removed shot used to sit.
+            ch.append(_c("Removed %s" % name, max(0.0, at(j1) - 0.5)))
     oo = dict((_ov_label(o), o) for o in old.get("overlays") or [])
     on = dict((_ov_label(o), o) for o in new.get("overlays") or [])
     gone = [k for k in oo if k not in on]
@@ -103,38 +142,46 @@ def diff(old, new):
                      and oo[g].get("pos") == on[k].get("pos")
                      and oo[g].get("style") == on[k].get("style")), None)
         if twin:
-            ch.append("Text changed: %s to %s" % (twin, k))
+            ch.append(_c("Text changed: %s to %s" % (twin, k), _ov_time(on[k], st)))
             gone.remove(twin)
             came.remove(k)
-    ch += ["Added overlay %s" % k for k in came]
-    ch += ["Removed overlay %s" % k for k in gone]
+    ch += [_c("Added overlay %s" % k, _ov_time(on[k], st)) for k in came]
+    ch += [_c("Removed overlay %s" % k, _ov_time(oo[k], st_old)) for k in gone]
     for k in on:
         if k in oo:
             f = _fields(oo[k], on[k], ["style", "pos", "size", "start", "end", "seg",
                                        "fade", "align", "color", "bg", "y", "width"])
             if f:
-                ch.append("Overlay %s: %s" % (k, ", ".join(f)))
+                ch.append(_c("Overlay %s: %s" % (k, ", ".join(f)), _ov_time(on[k], st)))
     for key, label in (("captions", "Captions"), ("music", "Music")):
         a, b = old.get(key), new.get(key)
         if a != b:
             if not a:
-                ch.append("%s turned on" % label)
+                ch.append(_c("%s turned on" % label))
             elif not b:
-                ch.append("%s turned off" % label)
+                ch.append(_c("%s turned off" % label))
             else:
-                ch.append("%s: %s" % (label, ", ".join(_fields(a, b, sorted(set(a) | set(b))))))
+                ch.append(_c("%s: %s" % (label, ", ".join(_fields(a, b, sorted(set(a) | set(b)))))))
     xa = [(s["file"], s.get("at"), s.get("gain_db")) for s in old.get("sfx") or []]
     xb = [(s["file"], s.get("at"), s.get("gain_db")) for s in new.get("sfx") or []]
     for s in xb:
         if s not in xa:
-            ch.append("Sound effect %s at %ss" % (os.path.basename(s[0]), _fmt(s[1])))
+            ch.append(_c("Sound effect %s at %ss" % (os.path.basename(s[0]), _fmt(s[1])), s[1]))
     for s in xa:
         if s not in xb:
-            ch.append("Removed sound effect %s at %ss" % (os.path.basename(s[0]), _fmt(s[1])))
+            ch.append(_c("Removed sound effect %s at %ss" % (os.path.basename(s[0]), _fmt(s[1])), s[1]))
     f = _fields(old, new, ["fps", "aspects"])
     if f:
-        ch.append("Settings: " + ", ".join(f))
-    return ch or ["No changes to the edit"]
+        ch.append(_c("Settings: " + ", ".join(f)))
+    total = st[-1]
+    for c in ch:
+        if c.t is not None:
+            c.t = round(min(c.t, max(0.0, total - 0.1)), 2)
+    return ch or [_c("No changes to the edit")]
+
+
+def times(changes):
+    return [getattr(c, "t", None) for c in changes]
 
 
 WAITING = ("open", "requested", "note")   # older records used the last two
@@ -218,7 +265,8 @@ def snapshot(ad_dir, note="", done=None):
             v["feedback"] = stay
     h["versions"].append({"n": n, "at": int(time.time()), "note": note,
                           "seconds": results[0]["secs"], "files": files,
-                          "changes": changes, "answers": addressed,
+                          "changes": changes, "change_times": times(changes),
+                          "answers": addressed,
                           "feedback": carried if prev else []})
     _save(ad_dir, h)
     render.write_preview_page(ad_dir, tl)
