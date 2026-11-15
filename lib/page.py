@@ -47,6 +47,7 @@ button.go:hover{filter:brightness(1.06)}button.go:disabled{opacity:.5;cursor:def
 .tc:hover{background:color-mix(in srgb,var(--accent) 24%,transparent)}
 .tc.off,.tc.gen{background:var(--hover);color:var(--mute)}
 .tc.gen{cursor:default}
+.seg{display:flex;gap:4px}
 #clist,.clist{margin-top:14px}
 .fb{display:flex;gap:12px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line);white-space:pre-wrap}
 .fb .x{flex:1;min-width:0}
@@ -115,7 +116,7 @@ function label() {
 function addRow(text, t, id) {
   const row = document.createElement('div'); row.className = 'fb'; row.dataset.t = t === null ? 1e9 : t;
   const tc = document.createElement(t === null ? 'span' : 'button');
-  tc.className = 'tc' + (t === null ? ' gen' : ''); tc.textContent = t === null ? 'General' : fmt(t);
+  tc.className = 'tc' + (t === null ? ' gen' : ''); tc.textContent = t === null ? 'Whole video' : fmt(t);
   if (t !== null) tc.dataset.seek = t;
   const x = document.createElement('div'); x.className = 'x'; x.textContent = text;
   const st = document.createElement('span'); st.className = 'st open'; st.textContent = 'Not sent yet';
@@ -132,10 +133,13 @@ function addRow(text, t, id) {
 if (box) {
   const v = vidOf(box);
   let pinned = true, at = 0;
-  const show = () => { chip.textContent = pinned ? fmt(at) : 'General'; chip.classList.toggle('off', !pinned); };
+  const whole = $('#whole');
+  const show = () => { chip.textContent = fmt(at); chip.classList.toggle('off', !pinned); whole.classList.toggle('off', pinned);
+    box.placeholder = pinned ? 'Comment at this moment, then Enter' : 'Comment on the whole video, then Enter'; };
+  whole.addEventListener('click', () => { pinned = false; show(); box.focus(); });
   // The timecode follows the playhead until you start typing, then it holds.
   v.addEventListener('timeupdate', () => { if (!box.value.trim()) { at = v.currentTime; show(); } });
-  chip.addEventListener('click', () => { pinned = !pinned; show(); box.focus(); });
+  chip.addEventListener('click', () => { pinned = true; show(); box.focus(); });
   try { box.value = localStorage.getItem(KEY) || ''; } catch (e) {}
   box.addEventListener('input', () => { if (box.value.trim()) v.pause();
     try { localStorage.setItem(KEY, box.value); } catch (e) {} });
@@ -236,7 +240,7 @@ def write(ad_dir, tl):
             "<div class='fb' data-t='%s'>%s<div class='x'>%s<span class='st %s'>%s</span></div>%s</div>" % (
                 f["t"] if f.get("t") is not None else 1e9,
                 "<button class='tc' data-seek='%s'>%s</button>" % (f["t"], versions.tc(f["t"]))
-                if f.get("t") is not None else "<span class='tc gen'>General</span>",
+                if f.get("t") is not None else "<span class='tc gen'>Whole video</span>",
                 _e(f["text"]), f["status"],
                 "Done in version %d" % f["done_in"] if f["status"] == "done"
                 else label.get(f["status"], f["status"]),
@@ -250,8 +254,9 @@ def write(ad_dir, tl):
             if v.get("note"):
                 body.append("<div class='note'>%s</div>" % _e(v["note"]))
             body.append(
-                "<div class='compose'><button class='tc' id='tc' title='Pinned to this moment. "
-                "Click for a general comment.'>0:00.0</button>"
+                "<div class='compose'><div class='seg'><button class='tc' id='tc' title='Comment on "
+                "this moment'>0:00.0</button><button class='tc off' id='whole' title='Comment on "
+                "the whole video'>Whole video</button></div>"
                 "<textarea id='fb' rows='1' placeholder='Comment at this moment, then Enter'></textarea>"
                 "<button class='go' id='go' data-v='%d' title='Send all comments to Claude "
                 "(Cmd+Enter)'>Redo%s</button></div>"

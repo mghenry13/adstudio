@@ -178,7 +178,7 @@ def wait(ad_dir, timeout=None):
             if p:
                 for fb in p:
                     if fb.get("t") is None:
-                        out("FEEDBACK on v%d (general): %s" % (fb["version"], fb["text"]))
+                        out("FEEDBACK on v%d (whole video): %s" % (fb["version"], fb["text"]))
                     else:
                         out("FEEDBACK on v%d at %s [%s]: %s" % (
                             fb["version"], versions.tc(fb["t"]),
