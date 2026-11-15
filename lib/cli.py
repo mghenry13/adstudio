@@ -266,7 +266,8 @@ def cmd_feedback(a):
     from . import versions
     if len(a) < 3:
         raise Fail('usage: adstudio feedback <brand>/<ad> <version> "text"')
-    versions.add_feedback(_ad_dir(a[0]), int(a[1].lstrip("v")), " ".join(a[2:]),
+    words = [x for x in a[2:] if x != "--note-only"]
+    versions.add_feedback(_ad_dir(a[0]), int(a[1].lstrip("v")), " ".join(words),
                           redo="--note-only" not in a)
     out("feedback saved on v%s" % a[1].lstrip("v"))
 

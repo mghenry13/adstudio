@@ -150,10 +150,12 @@ def snapshot(ad_dir, note=""):
     save_json(os.path.join(vdir(ad_dir), "v%d.json" % n), tl)
     addressed = None
     if prev:
+        got = []
         for fb in prev.get("feedback", []):
             if fb.get("status") == "requested":
                 fb["status"], fb["done_in"] = "done", n
-                addressed = fb["text"]
+                got.append(("%s  " % tc(fb["t"]) if fb.get("t") is not None else "") + fb["text"])
+        addressed = "\n".join(got) or None
     h["versions"].append({"n": n, "at": int(time.time()), "note": note,
                           "seconds": results[0]["secs"], "files": files,
                           "changes": changes, "answers": addressed, "feedback": []})
@@ -165,14 +167,31 @@ def snapshot(ad_dir, note=""):
     return n
 
 
-def add_feedback(ad_dir, n, text, redo=True):
+def tc(t):
+    """Seconds as m:ss.t, the way a comment's timecode is shown."""
+    t = max(0.0, float(t))
+    return "%d:%04.1f" % (int(t // 60), t % 60)
+
+
+def add_feedback(ad_dir, n, text, redo=True, t=None, delete=None):
+    """Comments collect as "open" (optionally pinned to a time in the video).
+    Redo sends every open comment on that version to Claude at once."""
     h = history(ad_dir)
     v = next((x for x in h["versions"] if x["n"] == int(n)), None)
     if not v:
         raise Fail("no version %s" % n)
-    v.setdefault("feedback", []).append(
-        {"text": text.strip(), "at": int(time.time()),
-         "status": "requested" if redo else "note"})
+    fbs = v.setdefault("feedback", [])
+    if delete is not None:
+        fbs[:] = [f for f in fbs if not (f["at"] == delete and f["status"] == "open")]
+    if text and text.strip():
+        fb = {"text": text.strip(), "at": int(time.time() * 1000), "status": "open"}
+        if t is not None:
+            fb["t"] = round(max(0.0, min(float(t), v.get("seconds", 1e9))), 2)
+        fbs.append(fb)
+    if redo:
+        for f in fbs:
+            if f["status"] in ("open", "note"):
+                f["status"] = "requested"
     _save(ad_dir, h)
     from . import render
     render.write_preview_page(ad_dir, T.load(ad_dir))
@@ -185,8 +204,31 @@ def pending(ad_dir):
     for v in history(ad_dir)["versions"]:
         for fb in v.get("feedback", []):
             if fb.get("status") == "requested":
-                res.append({"version": v["n"], "text": fb["text"]})
+                res.append({"version": v["n"], "text": fb["text"], "t": fb.get("t")})
+    res.sort(key=lambda r: (r["version"], r["t"] if r["t"] is not None else -1))
     return res
+
+
+def where(ad_dir, n, t):
+    """What is on screen at time t of version n, from that version's timeline."""
+    tl = load_json(os.path.join(vdir(ad_dir), "v%d.json" % n))
+    if not tl:
+        return ""
+    fps, pos = float(tl.get("fps", 30)), 0.0
+    for i, s in enumerate(tl.get("segments", [])):
+        if "clip" in s and "in" in s and "out" in s:
+            d = (float(s["out"]) - float(s["in"])) / float(s.get("speed", 1) or 1)
+        else:
+            d = float(s.get("dur", 2.0))
+        d = max(1, round(d * fps)) / fps
+        if t < pos + d or i == len(tl["segments"]) - 1:
+            src = ""
+            if "clip" in s and "in" in s:
+                src = ", source time %.2fs" % (float(s["in"]) + (t - pos) * float(s.get("speed", 1) or 1))
+            return "segment %d (index %d, %s), %.2fs into it%s" % (
+                i + 1, i, _seg_label(s), t - pos, src)
+        pos += d
+    return ""
 
 
 def restore(ad_dir, n):

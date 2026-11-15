@@ -134,10 +134,16 @@ class Handler(SimpleHTTPRequestHandler):
             n = int(self.headers.get("Content-Length", "0"))
             d = json.loads(self.rfile.read(min(n, 20000)) or b"{}")
             text = str(d.get("text", "")).strip()[:4000]
-            if not text:
-                raise Fail("feedback is empty")
+            redo, delete = bool(d.get("redo", False)), d.get("delete")
+            if not text and not redo and delete is None:
+                raise Fail("comment is empty")
             ad = ad_dir_for(d.get("ad"))
-            versions.add_feedback(ad, int(d.get("version")), text, redo=bool(d.get("redo", True)))
+            t = d.get("t")
+            versions.add_feedback(ad, int(d.get("version")), text, redo=redo,
+                                  t=float(t) if t is not None else None,
+                                  delete=int(delete) if delete is not None else None)
+            if redo and not versions.pending(ad):
+                raise Fail("add a comment first")
             return self._json(200, state(ad))
         except (Fail, ValueError, TypeError) as e:
             return self._json(400, {"error": str(e)})
@@ -170,7 +176,12 @@ def wait(ad_dir, timeout=None):
             p = versions.pending(ad_dir)
             if p:
                 for fb in p:
-                    out("FEEDBACK on v%d: %s" % (fb["version"], fb["text"]))
+                    if fb.get("t") is None:
+                        out("FEEDBACK on v%d (general): %s" % (fb["version"], fb["text"]))
+                    else:
+                        out("FEEDBACK on v%d at %s [%s]: %s" % (
+                            fb["version"], versions.tc(fb["t"]),
+                            versions.where(ad_dir, fb["version"], fb["t"]), fb["text"]))
                 return p
             with open(hb, "w") as f:
                 f.write(str(time.time()))

@@ -85,6 +85,9 @@ and presses Redo. Keep this loop running whenever an ad is being reviewed:
    saves vN with a change list computed from the timeline.
 3. Run `adstudio wait <brand>/<ad>` as a background command. It exits and
    wakes you when the user presses Redo, printing their feedback.
+   Comments pinned to a moment arrive as
+   `FEEDBACK on v6 at 0:07.4 [segment 3 (index 2, clip ...), 1.20s into it, source time 14.30s]: text`.
+   Use that to find the exact segment, overlay or caption the comment is about.
 4. Apply the feedback to `timeline.json`, `snapshot` again (this marks the
    feedback done and shows it on the new version), then `wait` again.
    Do exactly what was asked; if something is unclear or cannot be done,

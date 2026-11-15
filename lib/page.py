@@ -33,6 +33,18 @@ h3{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mu
 ul{margin:0;padding-left:18px}li{margin:3px 0}
 .answers{border-left:3px solid var(--accent);padding:2px 0 2px 12px;margin-top:12px;color:var(--mute);white-space:pre-wrap}
 .fb{border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:6px 0;white-space:pre-wrap}
+.fb{display:flex;gap:10px;align-items:flex-start}
+.fb .x{flex:1;min-width:0}
+.tc{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;padding:2px 7px;border-radius:6px;border:0;background:var(--accent);color:#fff;cursor:pointer;white-space:nowrap}
+.tc.off{background:none;color:var(--mute);border:1px dashed var(--line)}
+.tc.gen{background:color-mix(in srgb,var(--ink) 10%,transparent);color:var(--mute);cursor:default}
+.del{border:0;background:none;color:var(--mute);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px}
+.marks{position:relative;height:14px;margin-top:6px;border-radius:7px;background:color-mix(in srgb,var(--ink) 9%,transparent);cursor:pointer}
+.marks i{position:absolute;top:2px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--accent);border:2px solid var(--card)}
+.marks i.done{background:var(--ok)}
+.marks b{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);opacity:.55}
+.compose{display:flex;gap:8px;align-items:flex-start}
+.compose textarea{min-height:44px;height:44px}
 .fb .st{display:block;font-size:12px;margin-top:4px;color:var(--mute)}
 .fb .st.requested{color:var(--warn)}.fb .st.done{color:var(--ok)}
 textarea{width:100%;min-height:92px;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical}
@@ -56,27 +68,56 @@ document.querySelectorAll('.tabs').forEach(t => t.addEventListener('click', e =>
   v.src = b.dataset.src; v.currentTime = at; if (playing) v.play();
   t.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
 }));
-const box = $('#fb'), go = $('#go'), msg = $('#msg');
+const box = $('#fb'), go = $('#go'), msg = $('#msg'), chip = $('#tc');
 const KEY = 'adstudio-draft-' + AD;
+const fmt = t => Math.floor(t / 60) + ':' + (t %% 60 < 10 ? '0' : '') + (t %% 60).toFixed(1);
+const vidOf = el => el.closest('.v').querySelector('video');
+// Timecodes and markers seek the video in their own version card.
+document.addEventListener('click', e => {
+  const s = e.target.closest('[data-seek]');
+  if (s) { const v = vidOf(s); v.currentTime = +s.dataset.seek; v.pause(); return; }
+  const m = e.target.closest('.marks');
+  if (m) { const v = vidOf(m), r = m.getBoundingClientRect();
+    if (v.duration) v.currentTime = (e.clientX - r.left) / r.width * v.duration; }
+});
+document.querySelectorAll('.v').forEach(card => {
+  const v = card.querySelector('video'), head = card.querySelector('.marks b');
+  if (v && head) v.addEventListener('timeupdate', () => { if (v.duration) head.style.left = (v.currentTime / v.duration * 100) + '%%'; });
+});
+async function post(body) {
+  const r = await fetch('/api/feedback', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(Object.assign({ad: AD, version: +go.dataset.v}, body))});
+  if (!r.ok) throw new Error((await r.json()).error || r.status);
+  try { localStorage.removeItem(KEY); } catch (e) {}
+  location.reload();
+}
 if (box) {
+  const v = vidOf(box);
+  let pinned = true, at = 0;
+  const show = () => { chip.textContent = pinned ? fmt(at) : 'General'; chip.classList.toggle('off', !pinned); };
+  // The timecode follows the playhead until you start typing, then it holds.
+  v.addEventListener('timeupdate', () => { if (!box.value.trim()) { at = v.currentTime; show(); } });
+  chip.addEventListener('click', () => { pinned = !pinned; show(); box.focus(); });
   try { box.value = localStorage.getItem(KEY) || ''; } catch (e) {}
-  box.addEventListener('input', () => { try { localStorage.setItem(KEY, box.value); } catch (e) {} });
-  box.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') go.click(); });
-  go.addEventListener('click', async () => {
+  box.addEventListener('input', () => { if (box.value.trim()) v.pause();
+    try { localStorage.setItem(KEY, box.value); } catch (e) {} });
+  const send = async redo => {
     const text = box.value.trim();
-    if (!text) { say('Write what to change first.', 'warn'); return; }
+    if (!text && !redo) return;
     go.disabled = true; say('Sending...');
-    try {
-      const r = await fetch('/api/feedback', {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ad: AD, version: +go.dataset.v, text, redo: true})});
-      if (!r.ok) throw new Error((await r.json()).error || r.status);
-      try { localStorage.removeItem(KEY); } catch (e) {}
-      location.reload();
-    } catch (e) {
-      go.disabled = false;
-      say('Could not send. Is the preview server running? (adstudio serve) ' + e.message, 'warn');
-    }
+    try { await post({text, t: text && pinned ? at : null, redo}); }
+    catch (e) { go.disabled = false;
+      say(e.message === 'add a comment first' ? 'Add a comment first.'
+          : 'Could not send. Is the preview server running? (adstudio serve) ' + e.message, 'warn'); }
+  };
+  box.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(true); }
+    else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(false); }
   });
+  go.addEventListener('click', () => send(true));
+  document.querySelectorAll('.del').forEach(d => d.addEventListener('click', () =>
+    post({text: '', redo: false, delete: +d.dataset.at}).catch(e => say(e.message, 'warn'))));
+  show();
 }
 function say(t, cls) { if (msg) { msg.textContent = t; msg.className = 'msg ' + (cls || ''); } }
 async function poll() {
@@ -101,10 +142,11 @@ def _e(s):
 
 
 def _when(t):
+    t = t / 1000.0 if t > 1e11 else t      # newer comments store milliseconds
     return time.strftime("%b %d, %H:%M", time.localtime(t))
 
 
-def _video(files, base):
+def _video(files, base, feedback=None, seconds=1.0):
     keys = list(files)
     if not keys:
         return ""
@@ -114,8 +156,14 @@ def _video(files, base):
         tabs = "<div class='tabs'>%s</div>" % "".join(
             "<button class='%s' data-src='%s'>%s</button>" % ("on" if i == 0 else "", src(k), k)
             for i, k in enumerate(keys))
-    return "<div><video src='%s' controls loop playsinline preload='metadata'></video>%s</div>" % (
-        src(keys[0]), tabs)
+    marks = "".join(
+        "<i class='%s' style='left:%.2f%%' data-seek='%s' title='%s'></i>" % (
+            "done" if f.get("status") == "done" else "", 100.0 * f["t"] / max(seconds, 0.1),
+            f["t"], _e(f["text"]))
+        for f in (feedback or []) if f.get("t") is not None)
+    return ("<div><video src='%s' controls loop playsinline preload='metadata'></video>"
+            "<div class='marks' title='Comments on the timeline'><b></b>%s</div>%s</div>") % (
+        src(keys[0]), marks, tabs)
 
 
 def write(ad_dir, tl):
@@ -136,25 +184,34 @@ def write(ad_dir, tl):
                         % (v["n"] - 1, _e(v["answers"])))
         body.append("<h3>What changed</h3><ul>%s</ul>" % "".join(
             "<li>%s</li>" % _e(c) for c in v["changes"]))
-        fbs = v.get("feedback", [])
+        fbs = sorted(v.get("feedback", []),
+                     key=lambda f: (f.get("t") is None, f.get("t") or 0, f["at"]))
         if fbs:
-            label = {"requested": "Redo requested", "note": "Note"}
-            body.append("<h3>Feedback</h3>" + "".join(
-                "<div class='fb'>%s<span class='st %s'>%s &middot; %s</span></div>" % (
+            label = {"requested": "Sent to Claude", "note": "Note", "open": "Not sent yet"}
+            body.append("<h3>Comments</h3>" + "".join(
+                "<div class='fb'>%s<div class='x'>%s<span class='st %s'>%s &middot; %s</span></div>%s</div>" % (
+                    "<button class='tc' data-seek='%s'>%s</button>" % (f["t"], versions.tc(f["t"]))
+                    if f.get("t") is not None else "<span class='tc gen'>General</span>",
                     _e(f["text"]), f["status"],
                     "Done in version %d" % f["done_in"] if f["status"] == "done"
-                    else label.get(f["status"], f["status"]), _when(f["at"])) for f in fbs))
+                    else label.get(f["status"], f["status"]), _when(f["at"]),
+                    "<button class='del' data-at='%d' title='Delete'>&times;</button>" % f["at"]
+                    if f["status"] == "open" and newest else "") for f in fbs))
         if newest:
+            n_open = sum(1 for f in fbs if f["status"] == "open")
             body.append(
-                "<h3>What should change?</h3>"
-                "<textarea id='fb' placeholder='Say it like you would in chat. "
-                "Example: hook text bigger, cut the first clip half a second earlier, "
-                "lose the end card.'></textarea>"
-                "<div class='row'><button class='go' id='go' data-v='%d'>Redo</button>"
-                "<span class='msg' id='msg'>Cmd+Enter also sends.</span></div>"
-                "<div class='msg' id='working' style='margin-top:8px'></div>" % v["n"])
+                "<h3>Add a comment</h3>"
+                "<div class='compose'><button class='tc' id='tc' title='Click to switch between "
+                "this moment and a general comment'>0:00.0</button>"
+                "<textarea id='fb' placeholder='Pause where something is wrong and type. "
+                "Enter adds the comment.'></textarea></div>"
+                "<div class='row'><button class='go' id='go' data-v='%d'>Redo%s</button>"
+                "<span class='msg' id='msg'>Enter adds a comment. Redo sends them all to Claude.</span></div>"
+                "<div class='msg' id='working' style='margin-top:8px'></div>" % (
+                    v["n"], " with %d comment%s" % (n_open, "" if n_open == 1 else "s") if n_open else ""))
         cards.append("<section class='v%s'>%s<div>%s</div></section>" % (
-            "" if newest else " old", _video(files, "versions"), "".join(body)))
+            "" if newest else " old",
+            _video(files, "versions", v.get("feedback"), v.get("seconds", 1.0)), "".join(body)))
     if not cards:
         drafts = []
         d = os.path.join(ad_dir, "previews")
