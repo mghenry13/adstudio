@@ -1,0 +1,68 @@
+/* Text and image overlays for video. Designed on a canvas 1080 CSS px wide
+   (1920 for 16:9); the renderer scales it to the output size, so one set of
+   numbers serves drafts and finals.
+
+   Safe zones keep text clear of the Reels / TikTok interface: the top bar,
+   and the caption, buttons and progress bar at the bottom. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+body { position: relative; font-family: var(--font-body); color: #fff;
+       -webkit-font-smoothing: antialiased; }
+
+body.aspect-9x16 { --safe-x: 64px; --safe-top: 250px; --safe-bottom: 400px; --caption-bottom: 520px; }
+body.aspect-4x5  { --safe-x: 64px; --safe-top: 90px;  --safe-bottom: 90px;  --caption-bottom: 200px; }
+body.aspect-1x1  { --safe-x: 64px; --safe-top: 70px;  --safe-bottom: 70px;  --caption-bottom: 150px; }
+body.aspect-16x9 { --safe-x: 110px; --safe-top: 70px; --safe-bottom: 80px;  --caption-bottom: 130px; }
+
+.ov { position: absolute; left: var(--safe-x); right: var(--safe-x);
+      display: flex; justify-content: center; text-align: center; }
+.ov.align-left  { justify-content: flex-start; text-align: left; }
+.ov.align-right { justify-content: flex-end; text-align: right; }
+
+.pos-top     { top: var(--safe-top); }
+.pos-upper   { top: 27%; }
+.pos-center  { top: 50%; transform: translateY(-50%); }
+.pos-lower   { bottom: 30%; }
+.pos-caption { bottom: var(--caption-bottom); }
+.pos-bottom  { bottom: var(--safe-bottom); }
+
+.t { display: inline-block; max-width: 100%; font-size: calc(var(--fs) * var(--size, 1)); }
+.t em { font-style: normal; color: var(--caption-hi); }
+
+/* hook: the scroll-stopping line, on a solid chip so it reads on any footage */
+.style-hook .t { --fs: 96px; font-family: var(--font-display); line-height: 1.02;
+  color: var(--hook-fg); background: var(--hook-bg); padding: 0.22em 0.42em 0.26em;
+  border-radius: 22px; box-shadow: 0 10px 40px rgba(0,0,0,.28); text-wrap: balance; }
+.style-hook .t em { color: var(--accent); }
+
+/* caption: spoken-word captions, heavy with a dark outline */
+.style-caption .t { --fs: 72px; font-family: var(--font-body); font-weight: 800;
+  line-height: 1.08; color: var(--caption-fg); letter-spacing: -0.01em;
+  -webkit-text-stroke: 12px rgba(0,0,0,.9); paint-order: stroke fill;
+  text-shadow: 0 6px 22px rgba(0,0,0,.55); text-wrap: balance; }
+
+/* title: big display text with no chip */
+.style-title .t { --fs: 120px; font-family: var(--font-display); line-height: 0.9;
+  color: #fff; text-shadow: 0 6px 30px rgba(0,0,0,.5); text-wrap: balance; }
+
+/* label: small pill for a place, price or name */
+.style-label .t { --fs: 40px; font-family: var(--font-body); font-weight: 600;
+  color: var(--ink); background: var(--paper); padding: 0.4em 0.9em;
+  border-radius: 999px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+
+/* cta: the button-shaped call to action */
+.style-cta .t { --fs: 52px; font-family: var(--font-body); font-weight: 700;
+  color: var(--cta-fg); background: var(--cta-bg); padding: 0.5em 1.1em;
+  border-radius: 999px; box-shadow: 0 10px 34px rgba(0,0,0,.3); }
+
+/* hand: handwritten accent */
+.style-hand .t { --fs: 96px; font-family: var(--font-hand); line-height: 0.95;
+  color: #fff; text-shadow: 0 4px 20px rgba(0,0,0,.55); }
+
+/* plain: body text on a card segment, uses the ink color */
+.style-plain .t { --fs: 56px; font-family: var(--font-body); font-weight: 500;
+  line-height: 1.25; color: var(--ink); text-wrap: balance; }
+.style-display .t { --fs: 150px; font-family: var(--font-display); line-height: 0.86;
+  color: var(--ink); text-wrap: balance; }
+
+.ov img { display: block; height: auto; }

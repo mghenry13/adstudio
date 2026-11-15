@@ -1,0 +1,23 @@
+/* Brand kit for {{name}}. Every overlay and static reads these variables.
+   To use your own fonts, put the files in fonts/ and declare them:
+   @font-face { font-family: "My Display"; src: url("fonts/MyDisplay.woff2") format("woff2"); } */
+:root {
+  --paper: #F6F4EF;      /* light background, hook chip */
+  --ink: #111318;        /* darkest text */
+  --body: #3A3F4A;       /* body text */
+  --accent: #E4572E;     /* buttons, highlighted words */
+  --deep: #1B2A41;       /* dark background */
+  --tan: #C9C2B2;        /* warm neutral */
+  --amber: #FFD166;      /* caption highlight */
+
+  --font-display: -apple-system, "Helvetica Neue", sans-serif;
+  --font-body: -apple-system, "Helvetica Neue", sans-serif;
+  --font-hand: "Bradley Hand", cursive;
+
+  --hook-fg: var(--ink);
+  --hook-bg: var(--paper);
+  --caption-fg: #ffffff;
+  --caption-hi: var(--amber);
+  --cta-fg: #ffffff;
+  --cta-bg: var(--accent);
+}
