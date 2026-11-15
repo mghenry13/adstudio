@@ -43,8 +43,9 @@ def state(ad_dir):
             stamp = max(stamp, int(os.path.getmtime(os.path.join(ad_dir, n)) * 1000))
         except OSError:
             pass
+    from . import redo
     return {"stamp": stamp, "pending": versions.pending(ad_dir),
-            "listening": listening(ad_dir)}
+            "listening": listening(ad_dir), "runner": redo.status(ad_dir)}
 
 
 _seen = {}
@@ -161,6 +162,9 @@ class Handler(SimpleHTTPRequestHandler):
                 delete=int(delete) if delete is not None else None)
             if redo and not versions.pending(ad):
                 raise Fail("add a comment first")
+            if redo and not listening(ad):
+                from . import redo as runner     # no chat is waiting: start Claude
+                runner.start(ad)
             return self._json(200, dict(state(ad), added=added))
         except (Fail, ValueError, TypeError) as e:
             return self._json(400, {"error": str(e)})

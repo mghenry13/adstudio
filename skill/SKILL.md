@@ -92,6 +92,12 @@ and presses Redo. Keep this loop running whenever an ad is being reviewed:
    feedback done and shows it on the new version), then `wait` again.
    Do exactly what was asked; if something is unclear or cannot be done,
    say so in chat and put it in `--note` rather than guessing.
+If no chat is waiting when the user presses Redo, the server starts Claude
+Code by itself (`adstudio run-redo`, restricted to file edits and the
+adstudio command) and each ad keeps its own background conversation. So a
+chat does not have to stay open; `wait` is only for when you want the
+feedback to come to this chat. Turn the background run off with
+`adstudio config auto_redo false`.
 `adstudio history` shows the record, `adstudio restore <ad> <n>` goes back.
 
 ## References

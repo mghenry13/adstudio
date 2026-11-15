@@ -224,12 +224,16 @@ async function poll() {
   try {
     const s = await (await fetch('/api/state?ad=' + encodeURIComponent(AD), {cache: 'no-store'})).json();
     if (s.stamp && s.stamp > STAMP + 5 && !(fresh && s.stamp <= fresh.stamp + 5)) await check();
-    const w = $('#working');
-    if (w) { w.textContent = s.pending.length
-      ? (s.listening ? 'Claude has this and is working on the next version.'
-                     : 'Saved. No chat is watching this ad right now: say "redo" in the adstudio chat.')
-      : '';
-      w.className = 'msg ' + (s.pending.length ? (s.listening ? 'ok' : 'warn') : ''); }
+    const w = $('#working'), r = s.runner || {};
+    if (w) {
+      let t = '', cls = '';
+      if (s.pending.length) {
+        if (s.listening || r.state === 'running') { t = 'Claude is working on the next version.'; cls = 'ok'; }
+        else if (r.state === 'failed') { t = r.message + (r.command ? '\\n' + r.command : ''); cls = 'warn'; }
+        else { t = 'Sent. Waiting for Claude to pick this up.'; cls = ''; }
+      }
+      w.textContent = t; w.className = 'msg ' + cls; w.style.whiteSpace = 'pre-wrap';
+    }
   } catch (e) {}
   setTimeout(poll, 1500);
 }

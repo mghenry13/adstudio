@@ -22,6 +22,7 @@ ads/*/*/versions/*.mp4
 ads/*/*/preview.html
 ads/*/*/render.json
 ads/*/*/gfx/*/render-*.mov
+ads/*/*/.claude-session
 brands/*/index.html
 .DS_Store
 """

@@ -79,6 +79,10 @@ Then open a new Claude Code chat and say what you want:
 Claude follows `skill/SKILL.md`. It shows you a page with the draft; type
 feedback there and press Redo for the next version.
 
+Redo works without a chat open if the Claude Code command-line tool is
+signed in on your Mac (run `claude` in Terminal once and type `/login`).
+Otherwise, say "redo" in your chat.
+
 ## Two folders
 
 | Folder | What is in it | Shared? |

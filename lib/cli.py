@@ -300,6 +300,11 @@ def cmd_wait(a):
     serve.wait(_ad_dir(o.ad), o.timeout)
 
 
+def cmd_run_redo(a):
+    from . import redo
+    redo.run(_ad_dir(a[0]))
+
+
 def cmd_serve(a):
     from . import serve
     serve.serve(a[0] if a else None)
@@ -516,7 +521,7 @@ COMMANDS = {"voice": cmd_voice, "ingest": cmd_ingest, "clips": cmd_clips, "clip"
             "doctor": cmd_doctor, "timings": cmd_timings, "prune": cmd_prune,
             "key": cmd_key, "config": cmd_config, "snapshot": cmd_snapshot,
             "feedback": cmd_feedback, "history": cmd_history, "restore": cmd_restore,
-            "wait": cmd_wait, "serve": cmd_serve, "setup": cmd_setup,
+            "wait": cmd_wait, "serve": cmd_serve, "run-redo": cmd_run_redo, "setup": cmd_setup,
             "brand": cmd_brand, "where": cmd_where, "watch": cmd_watch, "sync": cmd_sync}
 
 
