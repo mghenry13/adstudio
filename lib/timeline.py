@@ -233,6 +233,7 @@ def _vo_captions(tl, ad_dir, total):
             continue
         at = float(v.get("at", 0))
         ws = voice.words(rpath(v["file"], ad_dir), v.get("caption") or v.get("text"))
+        line_cfg = dict(cfg, word_images=None) if v.get("word_images") is False else cfg
         chunks = _chunk(ws, int(cfg.get("max_words", 3)), int(cfg.get("max_chars", 18)))
         for k, ch in enumerate(chunks):
             a = at + ch[0]["start"]
@@ -240,7 +241,7 @@ def _vo_captions(tl, ad_dir, total):
                 b = at + chunks[k + 1][0]["start"]
             else:
                 b = at + ch[-1]["end"] + 0.18
-            _emit(out, cfg, ch, a, min(b, total), lambda t, at=at: at + t)
+            _emit(out, line_cfg, ch, a, min(b, total), lambda t, at=at: at + t)
     return out
 
 

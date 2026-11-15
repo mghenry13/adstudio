@@ -96,7 +96,8 @@ footage segments with `volume: 0`).
 Settings: `adstudio config voice_id adrian` (adrian, ethan, jordan, laura, sarah,
 hannah, selene, or any Fish voice id) and `voice_speed` (0.5 to 2). VO is speech,
 so `music.duck` lowers the music under it; set `"duck": false` for a steady bed.
-`captions: false` on a line leaves it uncaptioned. Captions spell words as the
+`captions: false` on a line leaves it uncaptioned; `word_images: false` keeps a
+line's words as text (say "Lakewood Truck Park" while "Lakewood" alone shows the logo). Captions spell words as the
 line's `text` (or `caption`, when the screen should read differently from what is
 said, like `"text": "open twenty four seven"`, `"caption": "Open 24/7"`).
 
