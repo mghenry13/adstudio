@@ -63,6 +63,22 @@ segment that has sound: `max_words` (3), `max_chars` (18), `upper`, `style`, `po
 `start` is where to begin inside the music file, `at` is where it enters the ad.
 `duck` lowers music under speech. Finals are normalised to -14 LUFS.
 
+## vo (voiceover lines)
+
+```json
+"vo": [{"text": "Right on Detroit Ave in Lakewood.", "at": 9.8, "gain_db": 0},
+       {"file": "vo/my-take-02.wav", "at": 11.85}]
+```
+
+`adstudio voice <brand>/<ad>` makes a scratch take for every line that only has
+`text` (Fish Audio S2.1 Pro on Runware, your Runware key) and saves word timings
+for every line, so captions follow the voice. `at` is where the first word lands.
+To use your own recording, set `file` (and drop `text`), then run `voice` again.
+Settings: `adstudio config voice_id adrian` (adrian, ethan, jordan, laura, sarah,
+hannah, selene, or any Fish voice id) and `voice_speed` (0.5 to 2). VO is speech,
+so `music.duck` lowers the music under it; set `"duck": false` for a steady bed.
+`captions: false` on a line leaves it uncaptioned.
+
 ## What the Premiere XML carries
 
 Cuts on the original files, reframing as Scale and Position, overlays as

@@ -31,6 +31,8 @@ HELP = """adstudio commands
     xml <brand>/<ad>              Premiere Pro XML   [--aspect 9:16]
     static <brand>/<ad>           static ads from statics.json
     gfx <brand>/<ad> <name>       render a HyperFrames animation (alpha MOV)
+    voice <brand>/<ad> [--force]  scratch VO for the timeline's "vo" lines (Runware,
+                                  Fish Audio) and word timings for VO captions
 
   References (ads and images to model new work on)
     ref add <brand> <file|url> [--note "what I like"]   measure cuts, break it down
@@ -348,6 +350,15 @@ def cmd_lib(a):
     raise Fail("usage: adstudio lib list|add")
 
 
+def cmd_voice(a):
+    from . import voice
+    p = argparse.ArgumentParser(prog="adstudio voice")
+    p.add_argument("ad")
+    p.add_argument("--force", action="store_true", help="remake every scratch line")
+    o = p.parse_args(a)
+    voice.build(_ad_dir(o.ad), force=o.force)
+
+
 def cmd_doctor(a):
     from . import gfx, transcribe
     ok = True
@@ -372,7 +383,7 @@ def cmd_doctor(a):
     hf = gfx.cli_path()
     row("HyperFrames CLI", bool(hf), hf or "install the HyperFrames app")
     row("gemini key", bool(read_key("gemini")), "set with: adstudio key gemini")
-    row("runware key", bool(read_key("runware")), "optional: adstudio key runware")
+    row("runware key", bool(read_key("runware")), "for scratch VO and Runware analysis: adstudio key runware")
     out("config: %s" % json.dumps(config()))
     return 0 if ok else 1
 
@@ -469,7 +480,7 @@ def cmd_prune(a):
     out("removed %d cached render files" % n)
 
 
-COMMANDS = {"ingest": cmd_ingest, "clips": cmd_clips, "clip": cmd_clip,
+COMMANDS = {"voice": cmd_voice, "ingest": cmd_ingest, "clips": cmd_clips, "clip": cmd_clip,
             "sheet": cmd_sheet, "frame": cmd_frame,
             "transcribe": cmd_transcribe, "analyze": cmd_analyze,
             "shots": cmd_shots, "search": cmd_search, "new": cmd_new,

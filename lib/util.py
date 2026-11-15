@@ -177,7 +177,10 @@ def config():
            "runware_gemini": "google:gemini@3.5-flash",
            "analysis_backend": "auto",
            "preview_port": 8787,
-           "workers": 4}
+           "workers": 4,
+           "voice_model": "fishaudio:s2.1@pro",
+           "voice_id": "adrian",          # or a Fish voice id / another stock name
+           "voice_speed": 1.0}
     cfg.update(load_json(os.path.join(ROOT, "config.json"), {}) or {})
     cfg.update(load_json(os.path.join(CONFIG_DIR, "config.json"), {}) or {})
     return cfg

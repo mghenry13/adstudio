@@ -101,7 +101,8 @@ def resolve(ad_dir, aspect):
     total = pos / float(fps)
 
     overlays = []
-    for j, o in enumerate(list(tl.get("overlays") or []) + _captions(tl, segs)):
+    for j, o in enumerate(list(tl.get("overlays") or []) + _captions(tl, segs)
+                          + _vo_captions(tl, ad_dir, pos / float(fps))):
         if o.get("aspects") and aspect not in o["aspects"]:
             continue
         ov = dict(o)
@@ -135,8 +136,53 @@ def resolve(ad_dir, aspect):
     for s in tl.get("sfx") or []:
         if not os.path.exists(rpath(s["file"], ad_dir)):
             raise Fail("sfx file not found: %s" % s["file"])
+    for i, v in enumerate(tl.get("vo") or []):
+        if not v.get("file") or not os.path.exists(rpath(v["file"], ad_dir)):
+            raise Fail("vo line %d has no audio yet (run: adstudio voice <brand>/<ad>)" % i)
     return {"tl": tl, "dir": ad_dir, "brand": brand, "fps": fps, "aspect": aspect,
             "segs": segs, "overlays": overlays, "total_f": pos, "total": total}
+
+
+def _chunk(ws, max_words, max_chars):
+    chunks, cur = [], []
+    for i, w in enumerate(ws):
+        cur.append(w)
+        nxt = ws[i + 1] if i + 1 < len(ws) else None
+        text_len = sum(len(x["w"]) for x in cur) + len(cur) - 1
+        if (nxt is None or len(cur) >= max_words or w["w"][-1:] in ".?!,"
+                or nxt["start"] - w["end"] > 0.45
+                or text_len + 1 + len(nxt["w"]) > max_chars):
+            chunks.append(cur)
+            cur = []
+    return chunks
+
+
+def _vo_captions(tl, ad_dir, total):
+    """Captions for voiceover lines, from the word timings `adstudio voice` saves."""
+    from . import voice
+    cfg = tl.get("captions")
+    if not cfg:
+        return []
+    out = []
+    for v in tl.get("vo") or []:
+        if v.get("captions") is False or not v.get("file"):
+            continue
+        at = float(v.get("at", 0))
+        ws = voice.words(rpath(v["file"], ad_dir))
+        chunks = _chunk(ws, int(cfg.get("max_words", 3)), int(cfg.get("max_chars", 18)))
+        for k, ch in enumerate(chunks):
+            a = at + ch[0]["start"]
+            if k + 1 < len(chunks) and chunks[k + 1][0]["start"] - ch[-1]["end"] < 0.45:
+                b = at + chunks[k + 1][0]["start"]
+            else:
+                b = at + ch[-1]["end"] + 0.18
+            text = " ".join(x["w"] for x in ch).rstrip(".,")
+            if cfg.get("upper"):
+                text = text.upper()
+            out.append({"text": text, "style": cfg.get("style", "caption"),
+                        "pos": cfg.get("pos", "caption"), "size": cfg.get("size", 1),
+                        "start": a, "end": min(b, total), "_caption": True})
+    return out
 
 
 def _captions(tl, segs):

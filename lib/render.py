@@ -202,6 +202,13 @@ def _audio(R, mode):
         graph.append(f)
         speech.append("[s%d]" % k)
         k += 1
+    for v in tl.get("vo") or []:
+        args += ["-i", resolve(v["file"], R["dir"])]
+        graph.append("[%d:a]%s,volume=%.2fdB,adelay=%d:all=1[s%d]"
+                     % (k, norm, float(v.get("gain_db", 0)),
+                        int(round(float(v.get("at", 0)) * 1000)), k))
+        speech.append("[s%d]" % k)
+        k += 1
     mu = tl.get("music")
     duck = bool(mu and mu.get("duck", True) and speech)
     if speech:

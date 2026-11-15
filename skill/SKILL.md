@@ -86,6 +86,13 @@ and writes a breakdown (hook, beats, text style, pacing, sound). Use
 `ref show <id>` and model the new timeline on its structure. Never reuse a
 reference's footage, music or wording.
 
+## Voiceover
+
+Put voiceover lines in the timeline's `vo` list (`text` and `at`), then run
+`adstudio voice <brand>/<ad>` for scratch takes (Fish Audio via Runware, needs
+`adstudio key runware`) and caption timings. When the user records the real
+VO, set each line's `file` to their take and run `voice` again. See TIMELINE.md.
+
 ## Sound
 
 Music and SFX are generated in chat with the Runware connector (MiniMax
