@@ -28,7 +28,7 @@ When it finishes it prints two "Next steps" lines. Run them, then close and reop
 
 **5. adstudio itself**
 
-    git clone <this repo> ~/adstudio
+    git clone https://github.com/mghenry13/adstudio.git ~/adstudio
     cd ~/adstudio
     ./adstudio setup
 
