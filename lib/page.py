@@ -1,7 +1,7 @@
-"""The per-ad page: version history with feedback and a Redo button.
+"""The per-ad page: version history with timecoded comments.
 
 Written as a static file on every render or snapshot. The small script in it
-posts feedback to `adstudio serve` and reloads when a new version lands.
+saves comments through `adstudio serve` and reloads when a new version lands.
 """
 
 import html
@@ -47,7 +47,9 @@ button.go:hover{filter:brightness(1.06)}button.go:disabled{opacity:.5;cursor:def
 .tc:hover{background:color-mix(in srgb,var(--accent) 24%,transparent)}
 .tc.off,.tc.gen{background:var(--hover);color:var(--mute)}
 .tc.gen{cursor:default}
-.head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.hint{font-size:12.5px;color:var(--mute);margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--hover)}
+.hint:empty{display:none}
+.hint b{color:var(--ink);font-weight:600}
 .compose.two{margin-top:8px}
 #tc{cursor:default}
 #clist,.clist{margin-top:14px}
@@ -91,20 +93,23 @@ const $ = (s, r=document) => r.querySelector(s);
 const KEY = 'adstudio-draft-' + AD;
 const fmt = t => Math.floor(t / 60) + ':' + (t %% 60 < 10 ? '0' : '') + (t %% 60).toFixed(1);
 const vidOf = el => el.closest('.v').querySelector('video');
-let box, boxw, go, msg, chip, at = 0, fresh = null;
+let box, boxw, msg, chip, at = 0, fresh = null;
+const ver = () => +$('#clist').dataset.v;
 
 function say(t, cls) { if (msg) { msg.textContent = t; msg.className = 'msg ' + (cls || ''); } }
 async function post(body) {
   const r = await fetch('/api/feedback', {method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(Object.assign({ad: AD, version: +go.dataset.v}, body))});
+    body: JSON.stringify(Object.assign({ad: AD, version: ver()}, body))});
   const d = await r.json();
   if (!r.ok) throw new Error(d.error || r.status);
   STAMP = d.stamp;
   return d;
 }
+// Comments are applied from the Claude chat, so the page says how.
 function label() {
-  const n = document.querySelectorAll('#clist .st.open').length;
-  go.textContent = 'Redo' + (n ? ' with ' + n + ' comment' + (n === 1 ? '' : 's') : '');
+  const n = document.querySelectorAll('#clist .st.open').length, h = $('#hint');
+  if (!h) return;
+  h.innerHTML = n ? '<b>' + n + ' comment' + (n === 1 ? '' : 's') + ' waiting.</b> Say "redo" in your Claude chat for this ad to apply ' + (n === 1 ? 'it' : 'them') + '.' : '';
 }
 function addRow(text, t, id) {
   const row = document.createElement('div'); row.className = 'fb'; row.dataset.t = t === null ? 1e9 : t;
@@ -112,7 +117,7 @@ function addRow(text, t, id) {
   tc.className = 'tc' + (t === null ? ' gen' : ''); tc.textContent = t === null ? 'Whole video' : fmt(t);
   if (t !== null) tc.dataset.seek = t;
   const x = document.createElement('div'); x.className = 'x'; x.textContent = text;
-  const st = document.createElement('span'); st.className = 'st open'; st.textContent = 'Not sent yet';
+  const st = document.createElement('span'); st.className = 'st open'; st.textContent = 'Waiting';
   x.appendChild(st);
   const del = document.createElement('button'); del.className = 'del'; del.dataset.at = id; del.title = 'Delete'; del.textContent = '\u00d7';
   row.append(tc, x, del);
@@ -123,29 +128,20 @@ function addRow(text, t, id) {
     box.closest('.v').querySelector('.marks').appendChild(m); }
   label();
 }
-// Adds whatever is typed in either box; with redo, then sends every comment.
-async function send(redo) {
-  const items = [];
-  if (box.value.trim()) items.push([box, box.value.trim(), Math.round(at * 100) / 100, KEY]);
-  if (boxw.value.trim()) items.push([boxw, boxw.value.trim(), null, KEY + '-whole']);
-  if (!items.length && !redo) return;
-  go.disabled = true;
+// Saves whatever is typed in the given box.
+async function send(el) {
+  const text = el.value.trim();
+  if (!text) return;
+  const t = el === box ? Math.round(at * 100) / 100 : null;
   try {
-    for (const [el, text, t, key] of items) {
-      const d = await post({text, t, redo: false});
-      addRow(text, t, d.added);
-      el.value = ''; try { localStorage.removeItem(key); } catch (e) {}
-    }
-    if (redo) { await post({text: '', redo: true});
-      document.querySelectorAll('#clist .st.open').forEach(s => { s.className = 'st requested'; s.textContent = 'Sent to Claude'; });
-      document.querySelectorAll('#clist .del').forEach(d => d.remove()); label(); }
+    const d = await post({text, t});
+    addRow(text, t, d.added);
+    el.value = ''; try { localStorage.removeItem(el === box ? KEY : KEY + '-whole'); } catch (e) {}
     say('');
-    at = vidOf(box).currentTime; chip.textContent = fmt(at);
+    if (el === box) { at = vidOf(box).currentTime; chip.textContent = fmt(at); }
   } catch (e) {
-    say(e.message === 'add a comment first' ? 'Add a comment first.'
-        : 'Could not send. Is the preview server running? (adstudio serve) ' + e.message, 'warn');
+    say('Could not save. Is the preview server running? (adstudio serve) ' + e.message, 'warn');
   }
-  go.disabled = false;
 }
 
 // Clicks are handled once for the whole page, so they keep working after
@@ -157,10 +153,9 @@ document.addEventListener('click', async e => {
     t.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === tab)); return; }
   const s = e.target.closest('[data-seek]');
   if (s) { const v = vidOf(s); v.currentTime = +s.dataset.seek; v.pause(); return; }
-  if (e.target.closest('#go')) { send(true); return; }
   if (e.target.closest('#newv')) { swap(); return; }
   const d = e.target.closest('.del');
-  if (d) { try { await post({text: '', redo: false, delete: +d.dataset.at});
+  if (d) { try { await post({text: '', delete: +d.dataset.at});
       const m = document.querySelector('.marks i[data-at="' + d.dataset.at + '"]'); if (m) m.remove();
       d.closest('.fb').remove(); label();
     } catch (err) { say(err.message, 'warn'); } }
@@ -169,7 +164,7 @@ document.addEventListener('click', async e => {
 // Wires up the comment boxes of the latest version. Runs at load and again
 // after each swap.
 function init() {
-  box = $('#fb'); boxw = $('#fbw'); go = $('#go'); msg = $('#msg'); chip = $('#tc');
+  box = $('#fb'); boxw = $('#fbw'); msg = $('#msg'); chip = $('#tc');
   if (!box) return;
   const v = vidOf(box);
   at = 0;
@@ -186,8 +181,7 @@ function init() {
       if (el === box) { if (el.value.trim()) v.pause(); try { localStorage.setItem(KEY + '-at', at); } catch (e) {} }
       try { localStorage.setItem(key, el.value); } catch (e) {} });
     el.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(true); }
-      else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(false); }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(el); }
     });
   });
   chip.textContent = fmt(at); label();
@@ -214,7 +208,7 @@ async function check() {
   const text = await (await fetch(location.pathname + '?_=' + Date.now(), {cache: 'no-store'})).text();
   const doc = new DOMParser().parseFromString(text, 'text/html');
   const stamp = +(text.match(/let STAMP = (\\d+)/) || [0, 0])[1];
-  const theirs = doc.querySelector('#go'), mine = $('#go');
+  const theirs = doc.querySelector('#clist'), mine = $('#clist');
   if (theirs && mine && +theirs.dataset.v > +mine.dataset.v) {
     fresh = {doc, stamp};
     const b = $('#newv'); b.textContent = 'Version ' + theirs.dataset.v + ' is ready. Show it'; b.hidden = false;
@@ -231,16 +225,6 @@ async function poll() {
   try {
     const s = await (await fetch('/api/state?ad=' + encodeURIComponent(AD), {cache: 'no-store'})).json();
     if (s.stamp && s.stamp > STAMP + 5 && !(fresh && s.stamp <= fresh.stamp + 5)) await check();
-    const w = $('#working'), r = s.runner || {};
-    if (w) {
-      let t = '', cls = '';
-      if (s.pending.length) {
-        if (s.listening || r.state === 'running') { t = 'Claude is working on the next version.'; cls = 'ok'; }
-        else if (r.state === 'failed') { t = r.message + (r.command ? '\\n' + r.command : ''); cls = 'warn'; }
-        else { t = 'Sent. Waiting for Claude to pick this up.'; cls = ''; }
-      }
-      w.textContent = t; w.className = 'msg ' + cls; w.style.whiteSpace = 'pre-wrap';
-    }
   } catch (e) {}
   setTimeout(poll, 1500);
 }
@@ -290,27 +274,21 @@ def write(ad_dir, tl):
         files = dict((k, f + stamp) for k, f in v["files"].items())
         fbs = sorted(v.get("feedback", []),
                      key=lambda f: (f.get("t") is None, f.get("t") or 0, f["at"]))
-        label = {"requested": "Sent to Claude", "note": "Note", "open": "Not sent yet"}
+        waiting = ("open", "requested", "note")
         rows = "".join(
             "<div class='fb' data-t='%s'>%s<div class='x'>%s<span class='st %s'>%s</span></div>%s</div>" % (
                 f["t"] if f.get("t") is not None else 1e9,
                 "<button class='tc' data-seek='%s'>%s</button>" % (f["t"], versions.tc(f["t"]))
                 if f.get("t") is not None else "<span class='tc gen'>Whole video</span>",
-                _e(f["text"]), f["status"],
-("Done in version %d" % f["done_in"] if f["status"] == "done"
-                 else label.get(f["status"], f["status"]))
-                + (" &middot; written on version %d" % f["from"] if f.get("from") else ""),
+                _e(f["text"]), "done" if f["status"] == "done" else "open",
+                "Done in version %d" % f["done_in"] if f["status"] == "done"
+                else ("Still waiting, from version %d" % f["from"] if f.get("from") else "Waiting"),
                 "<button class='del' data-at='%d' title='Delete'>&times;</button>" % f["at"]
-                if f["status"] == "open" and newest else "") for f in fbs)
+                if f["status"] in waiting and newest else "") for f in fbs)
         body = []
         if newest:
-            n_open = sum(1 for f in fbs if f["status"] == "open")
-            body.append(
-                "<div class='head'><h2>Version %d <small>%s &middot; %.1fs</small></h2>"
-                "<button class='go' id='go' data-v='%d' title='Send all comments to Claude "
-                "(Cmd+Enter)'>Redo%s</button></div>" % (
-                    v["n"], _when(v["at"]), v["seconds"], v["n"],
-                    " with %d comment%s" % (n_open, "" if n_open == 1 else "s") if n_open else ""))
+            body.append("<h2>Version %d <small>%s &middot; %.1fs</small></h2>" % (
+                v["n"], _when(v["at"]), v["seconds"]))
             if v.get("note"):
                 body.append("<div class='note'>%s</div>" % _e(v["note"]))
             body.append(
@@ -318,8 +296,9 @@ def write(ad_dir, tl):
                 "<textarea id='fb' rows='1' placeholder='Comment at this moment, then Enter'></textarea></div>"
                 "<div class='compose two'><span class='tc gen'>Whole video</span>"
                 "<textarea id='fbw' rows='1' placeholder='Comment on the whole video, then Enter'></textarea></div>"
-                "<div class='msg' id='msg'></div><div class='msg' id='working'></div>"
-                "<div id='clist'>%s</div>" % rows)
+                "<div class='msg' id='msg'></div>"
+                "<div id='clist' data-v='%d'>%s</div>"
+                "<div class='hint' id='hint'></div>" % (v["n"], rows))
         elif v.get("note"):
             body.append("<div class='note'>%s</div>" % _e(v["note"]))
         if not newest and rows:
@@ -355,7 +334,7 @@ def write(ad_dir, tl):
                                   "style='max-width:300px'></video>"
                                   % (n, int(os.path.getmtime(os.path.join(d, n)))))
         cards.append("<div class='empty'>No saved versions yet. A version is saved with "
-                     "<code>adstudio snapshot %s</code>, and then feedback and Redo appear here."
+                     "<code>adstudio snapshot %s</code>, and then the comment boxes appear here."
                      "<div style='display:flex;gap:16px;flex-wrap:wrap;margin-top:14px'>%s</div></div>"
                      % (_e(ad_ref), "".join(drafts)))
     finals = ""

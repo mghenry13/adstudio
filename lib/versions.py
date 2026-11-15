@@ -137,13 +137,18 @@ def diff(old, new):
     return ch or ["No changes to the edit"]
 
 
+WAITING = ("open", "requested", "note")   # older records used the last two
+
+
 def waiting_comments(ad_dir):
-    """Comments sent with Redo that no version has answered yet (the real records)."""
+    """Every comment no version has answered yet (the real records), in the
+    order they read on the page: by timecode, whole-video ones last."""
     res = []
     for v in history(ad_dir)["versions"]:
         for fb in v.get("feedback", []):
-            if fb.get("status") == "requested":
+            if fb.get("status") in WAITING:
                 res.append(fb)
+    res.sort(key=lambda f: (f.get("t") is None, f.get("t") or 0, f.get("at", 0)))
     return res
 
 
@@ -154,7 +159,7 @@ def _label(fb):
 def snapshot(ad_dir, note="", done=None):
     """Keep the current drafts as the next version.
 
-    Every comment sent with Redo has to be accounted for: `done` lists the
+    Every waiting comment has to be accounted for: `done` lists the
     numbers (from `adstudio todo`) this version answers, or "all". Anything
     not listed stays waiting and moves to the new version, so a comment can
     never be marked done just because a version was saved."""
@@ -194,17 +199,23 @@ def snapshot(ad_dir, note="", done=None):
         got = []
         for v in h["versions"]:
             for fb in v.get("feedback", []):
-                if fb.get("status") == "requested" and (fb.get("at"), fb["text"]) in answered:
+                if fb.get("status") in WAITING and (fb.get("at"), fb["text"]) in answered:
                     fb["status"], fb["done_in"] = "done", n
                     got.append(_label(fb))
         addressed = "\n".join(got) or None
-        # Comments written but not yet sent must never be stranded on an old
-        # version: they move to the new one, still unsent, still editable.
-        carried = [f for f in prev.get("feedback", []) if f.get("status") in ("open", "note")]
-        prev["feedback"] = [f for f in prev.get("feedback", []) if f not in carried]
-        for f in carried:
-            f["status"] = "open"
-            f.setdefault("from", prev["n"])
+        # Whatever is still waiting moves to the new version, so the latest
+        # version always shows the complete to-do list and nothing is
+        # stranded on an old one.
+        for v in h["versions"]:
+            stay = []
+            for f in v.get("feedback", []):
+                if f.get("status") in WAITING:
+                    f["status"] = "open"
+                    f.setdefault("from", v["n"])
+                    carried.append(f)
+                else:
+                    stay.append(f)
+            v["feedback"] = stay
     h["versions"].append({"n": n, "at": int(time.time()), "note": note,
                           "seconds": results[0]["secs"], "files": files,
                           "changes": changes, "answers": addressed,
@@ -229,41 +240,26 @@ def tc(t):
 
 
 def add_feedback(ad_dir, n, text, redo=True, t=None, delete=None):
-    """Comments collect as "open" (optionally pinned to a time in the video).
-    Redo sends every open comment on that version to Claude at once."""
+    """Save a comment, optionally pinned to a time in the video. It waits
+    until a version answers it. (`redo` is ignored; kept for old callers.)"""
     h = history(ad_dir)
     v = next((x for x in h["versions"] if x["n"] == int(n)), None)
     if not v:
         raise Fail("no version %s" % n)
     fbs = v.setdefault("feedback", [])
     if delete is not None:
-        fbs[:] = [f for f in fbs if not (f["at"] == delete and f["status"] == "open")]
+        fbs[:] = [f for f in fbs if not (f["at"] == delete and f["status"] in WAITING)]
     if text and text.strip():
         fb = {"text": text.strip(), "at": int(time.time() * 1000), "status": "open"}
         if t is not None:
             fb["t"] = round(max(0.0, min(float(t), v.get("seconds", 1e9))), 2)
         fbs.append(fb)
         v["_added"] = fb["at"]
-    if redo:
-        for f in fbs:
-            if f["status"] in ("open", "note"):
-                f["status"] = "requested"
     added = v.pop("_added", None)
     _save(ad_dir, h)
     from . import render
     render.write_preview_page(ad_dir, T.load(ad_dir))
     return added
-
-
-def pending(ad_dir):
-    """Feedback with Redo pressed that no later version has answered."""
-    res = []
-    for v in history(ad_dir)["versions"]:
-        for fb in v.get("feedback", []):
-            if fb.get("status") == "requested":
-                res.append({"version": v["n"], "text": fb["text"], "t": fb.get("t")})
-    res.sort(key=lambda r: (r["version"], r["t"] if r["t"] is not None else -1))
-    return res
 
 
 def where(ad_dir, n, t):

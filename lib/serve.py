@@ -1,4 +1,4 @@
-"""Preview server: serves the workspace, takes feedback from the page, and tells
+"""Preview server: serves the workspace, saves comments from the page, and tells
 the page when to reload. Local only (binds to 127.0.0.1)."""
 
 import json
@@ -25,17 +25,6 @@ def ad_dir_for(ref):
     return d
 
 
-def heartbeat_path(ad_dir):
-    return os.path.join(MEDIA, "listening-" + os.path.relpath(ad_dir, ADS).replace("/", "--"))
-
-
-def listening(ad_dir):
-    try:
-        return time.time() - os.path.getmtime(heartbeat_path(ad_dir)) < 6
-    except OSError:
-        return False
-
-
 def state(ad_dir):
     stamp = 0
     for n in ("preview.html", os.path.join("versions", "history.json")):
@@ -43,9 +32,7 @@ def state(ad_dir):
             stamp = max(stamp, int(os.path.getmtime(os.path.join(ad_dir, n)) * 1000))
         except OSError:
             pass
-    from . import redo
-    return {"stamp": stamp, "pending": versions.pending(ad_dir),
-            "listening": listening(ad_dir), "runner": redo.status(ad_dir)}
+    return {"stamp": stamp, "waiting": len(versions.waiting_comments(ad_dir))}
 
 
 _seen = {}
@@ -151,20 +138,15 @@ class Handler(SimpleHTTPRequestHandler):
             n = int(self.headers.get("Content-Length", "0"))
             d = json.loads(self.rfile.read(min(n, 20000)) or b"{}")
             text = str(d.get("text", "")).strip()[:4000]
-            redo, delete = bool(d.get("redo", False)), d.get("delete")
-            if not text and not redo and delete is None:
+            delete = d.get("delete")
+            if not text and delete is None:
                 raise Fail("comment is empty")
             ad = ad_dir_for(d.get("ad"))
             t = d.get("t")
             added = versions.add_feedback(
-                ad, int(d.get("version")), text, redo=redo,
+                ad, int(d.get("version")), text,
                 t=float(t) if t is not None else None,
                 delete=int(delete) if delete is not None else None)
-            if redo and not versions.pending(ad):
-                raise Fail("add a comment first")
-            if redo and not listening(ad):
-                from . import redo as runner     # no chat is waiting: start Claude
-                runner.start(ad)
             return self._json(200, dict(state(ad), added=added))
         except (Fail, ValueError, TypeError) as e:
             return self._json(400, {"error": str(e)})
@@ -181,37 +163,3 @@ def serve(port=None):
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
-
-
-def wait(ad_dir, timeout=None):
-    """Block until the page sends feedback with Redo. Prints it and returns.
-
-    A chat runs this in the background; when it exits the chat is woken with
-    the feedback, applies it, snapshots, and waits again.
-    """
-    hb = heartbeat_path(ad_dir)
-    os.makedirs(MEDIA, exist_ok=True)
-    t0 = time.time()
-    try:
-        while True:
-            p = versions.pending(ad_dir)
-            if p:
-                for fb in p:
-                    if fb.get("t") is None:
-                        out("FEEDBACK on v%d (whole video): %s" % (fb["version"], fb["text"]))
-                    else:
-                        out("FEEDBACK on v%d at %s [%s]: %s" % (
-                            fb["version"], versions.tc(fb["t"]),
-                            versions.where(ad_dir, fb["version"], fb["t"]), fb["text"]))
-                return p
-            with open(hb, "w") as f:
-                f.write(str(time.time()))
-            if timeout and time.time() - t0 > timeout:
-                out("no feedback yet")
-                return []
-            time.sleep(1.0)
-    finally:
-        try:
-            os.unlink(hb)
-        except OSError:
-            pass

@@ -74,34 +74,26 @@ there when they want to browse assets or look up an id.
 5. On approval: `adstudio render <brand>/<ad> --aspect all` for MP4s and
    `adstudio xml <brand>/<ad>` for Premiere Pro.
 
-## Versions, feedback and Redo
+## Versions and comments
 
-The ad's page is a version history. The user reviews there, types feedback
-and presses Redo. Keep this loop running whenever an ad is being reviewed:
+The ad's page is a version history. The user watches there and leaves
+comments: some pinned to a timecode, some about the whole video. Comments
+are saved the moment they are typed. Nothing on the page starts work; the
+user comes to chat and says "redo" (or "apply my comments", or similar).
 
 1. Make sure `adstudio serve` is running (start it in the background if the
-   page does not load). It replaces live-serve for adstudio pages.
-2. When a draft is worth showing: `adstudio snapshot <brand>/<ad>`. That
-   saves vN with a change list computed from the timeline.
-3. Run `adstudio wait <brand>/<ad>` as a background command. It exits and
-   wakes you when the user presses Redo, printing their feedback.
-   Comments pinned to a moment arrive as
-   `FEEDBACK on v6 at 0:07.4 [segment 3 (index 2, clip ...), 1.20s into it, source time 14.30s]: text`.
-   Use that to find the exact segment, overlay or caption the comment is about.
-4. Run `adstudio todo <brand>/<ad>` and handle EVERY comment it lists, one by
-   one (timecoded and whole-video). Then `snapshot --done <numbers>` naming only
-   the comments the new version really answers; anything not done stays waiting
-   and shows on the next version. Re-run `todo` afterwards: it must be empty, or
-   you tell the user in chat which comment is left and why. Then `wait` again.
-   Never use `--done all` without having checked each item.
-   Do exactly what was asked; if something is unclear or cannot be done,
-   say so in chat and put it in `--note` rather than guessing.
-If no chat is waiting when the user presses Redo, the server starts Claude
-Code by itself (`adstudio run-redo`, restricted to file edits and the
-adstudio command) and each ad keeps its own background conversation. So a
-chat does not have to stay open; `wait` is only for when you want the
-feedback to come to this chat. Turn the background run off with
-`adstudio config auto_redo false`.
+   page does not load).
+2. When a draft is worth showing: `adstudio snapshot <brand>/<ad> --note "..."`.
+3. When the user asks you to apply their comments: `adstudio todo <brand>/<ad>`.
+   It lists every comment no version has answered, numbered, each with what
+   was on screen at its timecode (segment, clip, source time). Handle EVERY
+   one. If a comment asks for options or a discussion, answer it in chat.
+4. `adstudio snapshot <brand>/<ad> --done <numbers> --note "..."`, naming only
+   the comments the new version really answers. Anything not listed stays
+   waiting and shows on the new version. Never use `--done all` without
+   having checked each item. Tell the user in chat which comments are left
+   and why.
+The page offers the new version behind a "Version N is ready" button.
 `adstudio history` shows the record, `adstudio restore <ad> <n>` goes back.
 
 ## References

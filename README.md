@@ -2,7 +2,7 @@
 
 Make video and static ads by talking to Claude Code. Real footage in; draft
 previews in seconds; finished MP4s and a Premiere Pro XML out. Every version
-is kept on a page where you type feedback and press Redo.
+is kept on a page where you leave timecoded comments.
 
 ## Install
 
@@ -77,11 +77,7 @@ Then open a new Claude Code chat and say what you want:
 > ~/Movies/shoot and make a 15 second ad about the spring sale.
 
 Claude follows `skill/SKILL.md`. It shows you a page with the draft; type
-feedback there and press Redo for the next version.
-
-Redo works without a chat open if the Claude Code command-line tool is
-signed in on your Mac (run `claude` in Terminal once and type `/login`).
-Otherwise, say "redo" in your chat.
+comments there, then say "redo" in the chat for the next version.
 
 ## Two folders
 

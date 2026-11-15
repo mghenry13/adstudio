@@ -42,14 +42,13 @@ HELP = """adstudio commands
     ref show <id>                 the breakdown, cut times, contact sheet
 
   Versions and feedback
-    serve [port]                  preview server (pages, feedback box, Redo button)
-    todo <brand>/<ad>             comments sent with Redo that are not done yet
+    serve [port]                  preview server (version pages with comment boxes)
+    todo <brand>/<ad>             comments from the page that no version has answered yet
     snapshot <brand>/<ad> [--note ..] [--done 1,2|all]
                                   keep the draft as the next version; --done names the
                                   comments it answers (refuses while any are unaccounted)
     history <brand>/<ad>          versions, what changed, feedback
     feedback <brand>/<ad> <n> "text"   add feedback from chat instead of the page
-    wait <brand>/<ad>             block until the page sends feedback with Redo
     restore <brand>/<ad> <n>      make an old version the working edit again
 
   Library
@@ -268,15 +267,21 @@ def cmd_snapshot(a):
 
 
 def cmd_todo(a):
-    """Every comment sent with Redo that no version has answered yet."""
+    """Every comment no version has answered yet, with what is on screen at
+    each timecode so the right segment or overlay can be found."""
     from . import versions
     if not a:
         raise Fail("usage: adstudio todo <brand>/<ad>")
-    left = versions.waiting_comments(_ad_dir(a[0]))
+    d = _ad_dir(a[0])
+    left = versions.waiting_comments(d)
     if not left:
         out("no comments waiting")
+    hist = versions.history(d)["versions"]
     for i, f in enumerate(left):
         out("%d. %s" % (i + 1, versions._label(f)))
+        n = f.get("from") or next((v["n"] for v in hist if f in v.get("feedback", [])), None)
+        if f.get("t") is not None and n:
+            out("     on screen in v%d: %s" % (n, versions.where(d, n, f["t"])))
 
 
 def cmd_feedback(a):
@@ -284,8 +289,7 @@ def cmd_feedback(a):
     if len(a) < 3:
         raise Fail('usage: adstudio feedback <brand>/<ad> <version> "text"')
     words = [x for x in a[2:] if x != "--note-only"]
-    versions.add_feedback(_ad_dir(a[0]), int(a[1].lstrip("v")), " ".join(words),
-                          redo="--note-only" not in a)
+    versions.add_feedback(_ad_dir(a[0]), int(a[1].lstrip("v")), " ".join(words))
     out("feedback saved on v%s" % a[1].lstrip("v"))
 
 
@@ -306,20 +310,6 @@ def cmd_history(a):
 def cmd_restore(a):
     from . import versions
     versions.restore(_ad_dir(a[0]), int(a[1].lstrip("v")))
-
-
-def cmd_wait(a):
-    from . import serve
-    p = argparse.ArgumentParser(prog="adstudio wait")
-    p.add_argument("ad")
-    p.add_argument("--timeout", type=float)
-    o = p.parse_args(a)
-    serve.wait(_ad_dir(o.ad), o.timeout)
-
-
-def cmd_run_redo(a):
-    from . import redo
-    redo.run(_ad_dir(a[0]))
 
 
 def cmd_serve(a):
@@ -538,7 +528,7 @@ COMMANDS = {"todo": cmd_todo, "voice": cmd_voice, "ingest": cmd_ingest, "clips":
             "doctor": cmd_doctor, "timings": cmd_timings, "prune": cmd_prune,
             "key": cmd_key, "config": cmd_config, "snapshot": cmd_snapshot,
             "feedback": cmd_feedback, "history": cmd_history, "restore": cmd_restore,
-            "wait": cmd_wait, "serve": cmd_serve, "run-redo": cmd_run_redo, "setup": cmd_setup,
+            "serve": cmd_serve, "setup": cmd_setup,
             "brand": cmd_brand, "where": cmd_where, "watch": cmd_watch, "sync": cmd_sync}
 
 
