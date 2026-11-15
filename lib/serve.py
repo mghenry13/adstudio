@@ -47,6 +47,21 @@ def state(ad_dir):
             "listening": listening(ad_dir)}
 
 
+_seen = {}
+
+
+def _fresh():
+    """Pick up edits to the page code without a server restart, so a
+    long-running server never writes pages in an out-of-date layout."""
+    import importlib
+    from . import page
+    for mod in (versions, page):
+        m = os.path.getmtime(mod.__file__)
+        if _seen.setdefault(mod.__name__, m) != m:
+            _seen[mod.__name__] = m
+            importlib.reload(mod)
+
+
 class Handler(SimpleHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -125,6 +140,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/api/feedback":
             return self._json(404, {"error": "not found"})
+        _fresh()
         # Same-origin only: a page on another site must not be able to post here.
         origin = self.headers.get("Origin", "")
         host = self.headers.get("Host", "")
