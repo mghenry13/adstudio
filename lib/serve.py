@@ -80,6 +80,11 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
+        if u.path in ("", "/", "/index.html"):          # home is the projects page
+            self.send_response(302)
+            self.send_header("Location", "/ads/index.html")
+            self.end_headers()
+            return
         if u.path == "/api/state":
             try:
                 ad = urllib.parse.parse_qs(u.query).get("ad", [""])[0]

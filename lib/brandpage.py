@@ -21,7 +21,8 @@ CSS = """
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
 .wrap{max-width:1180px;margin:0 auto;padding:22px 24px 80px}
-h1{font-size:18px;margin:0;font-weight:650}
+h1{font-size:18px;margin:14px 0 0;font-weight:600}
+.crumbs{font-size:12.5px;color:var(--mute)}.crumbs a{color:var(--mute);text-decoration:none;border-bottom:1px solid var(--line)}.crumbs b{color:var(--ink)}
 .sub{color:var(--mute);font-size:13px;margin-top:2px}
 nav{margin:14px 0 6px;display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
 nav a{color:var(--mute);text-decoration:none;border-bottom:1px solid var(--line)}nav a:hover{color:var(--ink)}
@@ -262,11 +263,14 @@ def write(brand):
             "<link rel='stylesheet' href='brand.css'>"
             "<link rel='stylesheet' href='/tool/overlay.css'>"
             "<style>html,body{height:auto;overflow:auto}%s</style></head><body><div class='wrap'>"
+            "<div class='crumbs'><a href='/ads/index.html'>Projects</a> / "
+            "<a href='/ads/%s/index.html'>%s</a> / <b>Brand kit and footage</b></div>"
             "<h1>%s</h1><div class='sub'>%s &middot; updated %s &middot; click any key to copy it</div>"
             "<nav><a href='#rules'>Rules</a><a href='#kit'>Kit</a><a href='#folders'>Folders</a>"
             "<a href='#ads'>Ads</a><a href='#assets'>Assets</a>%s</nav>%s</div>"
             "<div id='toast'></div><script>%s</script></body></html>") % (
-        _e(b.get("name", brand)), CSS, _e(b.get("name", brand)), _e(b.get("url", "")),
+        _e(b.get("name", brand)), CSS, _e(brand), _e(b.get("name", brand)),
+        _e(b.get("name", brand)), _e(b.get("url", "")),
         time.strftime("%b %d, %H:%M"),
         "".join("<a href='/brands/%s/index.html'>%s &rarr;</a>" % (_e(x), _e(x)) for x in others),
         "".join(P), JS)

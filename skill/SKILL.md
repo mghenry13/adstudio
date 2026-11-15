@@ -74,6 +74,14 @@ there when they want to browse assets or look up an id.
 5. On approval: `adstudio render <brand>/<ad> --aspect all` for MP4s and
    `adstudio xml <brand>/<ad>` for Premiere Pro.
 
+## The web pages
+
+`adstudio serve` gives one path through everything: `/` lists the projects
+(brands), a project page lists its ads with the latest frame, version count
+and waiting comments, and each ad opens its version page. The project page
+also links to the brand kit page (rules, colours, fonts, footage with ids).
+When you finish something, give the user the ad's page URL.
+
 ## Versions and comments
 
 The ad's page is a version history. The user watches there and leaves

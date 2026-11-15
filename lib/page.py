@@ -10,7 +10,7 @@ import os
 import re
 import time
 
-from . import versions
+from . import hub, versions
 
 CSS = """
 :root{--bg:#fafaf9;--panel:#fff;--ink:#18181b;--mute:#71717a;--faint:#a1a1aa;--line:#e7e5e4;--hover:#f4f4f5;--accent:#e4572e;--ok:#15803d;--warn:#b45309;--cta:#16a34a}
@@ -21,6 +21,9 @@ body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.6 ui-monospace,"
 a{color:inherit}
 header{max-width:1180px;margin:0 auto;padding:22px 28px 16px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;flex-wrap:wrap}
 h1{font-size:15px;margin:0;font-weight:600}
+.crumbs{font-size:13px;color:var(--mute);display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+.crumbs a{text-decoration:none;border-bottom:1px solid var(--line)}.crumbs a:hover{color:var(--ink)}
+.crumbs b{color:var(--ink);font-weight:600}.crumbs i{font-style:normal;color:var(--faint)}
 .sub{color:var(--mute);font-size:12.5px;margin-left:12px;font-weight:400}
 .sub a{text-decoration:none;border-bottom:1px solid var(--line)}.sub a:hover{color:var(--ink)}
 .finals{font-size:12.5px;color:var(--mute);display:flex;gap:14px}
@@ -442,10 +445,12 @@ def write(ad_dir, tl):
     page = ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
             "<title>%s &middot; adstudio versions</title><style>%s</style></head><body>"
-            "<header><h1>%s<span class='sub'><a href='/brands/%s/index.html'>%s</a> &middot; %d version%s</span></h1>%s</header>"
+            "<header><div><nav class='crumbs'><a href='/ads/index.html'>Projects</a><i>/</i>"
+            "<a href='/ads/%s/index.html'>%s</a><i>/</i><b>%s</b>"
+            "<span class='sub'>%d version%s</span></nav></div>%s</header>"
             "<main>%s</main><button id='newv' class='newv' hidden></button>"
             "<script>%s</script></body></html>") % (
-        _e(name), CSS, _e(name), _e(tl.get("brand", "")), _e(tl.get("brand", "")), len(h),
+        _e(name), CSS, _e(tl.get("brand", "")), _e(hub.brand_name(tl.get("brand", ""))), _e(name), len(h),
         "" if len(h) == 1 else "s", finals, "".join(cards),
         JS % {"ad": json.dumps(ad_ref), "stamp": 0})
     dst = os.path.join(ad_dir, "preview.html")
@@ -458,3 +463,8 @@ def write(ad_dir, tl):
     with open(dst, "w") as f:
         f.write(page.replace("let STAMP = 0;", "let STAMP = %d;" % stamp))
     os.utime(dst, (stamp / 1000.0, stamp / 1000.0))
+    try:
+        hub.write_project(tl.get("brand", ""))
+        hub.write_home()
+    except Exception:          # an index page must never block an ad page
+        pass

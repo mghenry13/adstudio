@@ -24,6 +24,9 @@ ads/*/*/render.json
 ads/*/*/gfx/*/render-*.mov
 ads/*/*/.claude-session
 brands/*/index.html
+ads/index.html
+ads/*/index.html
+ads/*/*/thumb.jpg
 .DS_Store
 """
 LESSONS = """# Lessons

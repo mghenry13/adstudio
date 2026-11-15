@@ -313,7 +313,8 @@ def cmd_restore(a):
 
 
 def cmd_serve(a):
-    from . import serve
+    from . import serve, hub
+    hub.write_all()
     serve.serve(a[0] if a else None)
 
 
