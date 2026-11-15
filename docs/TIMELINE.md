@@ -60,6 +60,9 @@ brand kit. Use absolute `file://` URLs for its `@font-face` sources.
 `null` for none. Otherwise built from the Parakeet transcript of every footage
 segment that has sound: `max_words` (3), `max_chars` (18), `upper`, `style`, `pos`, `size`.
 
+Options: `build: true` reveals each chunk word by word; `emphasis: ["home", "50"]`
+marks those words as highlighted (`em`, which a style or ad.css can make bigger).
+
 ## music and sfx
 
 ```json

@@ -160,6 +160,32 @@ def _chunk(ws, max_words, max_chars):
     return chunks
 
 
+def _emit(out, cfg, ch, a, b, to_tl):
+    """One caption chunk. `build: true` reveals it word by word; `emphasis` words get *em*."""
+    emph = set(w.lower().strip(".,?!") for w in cfg.get("emphasis") or [])
+
+    def fmt(ws):
+        parts = []
+        for x in ws:
+            w = x["w"]
+            core = w.strip(".,?!")
+            if core.lower() in emph:
+                w = w.replace(core, "*%s*" % core)
+            parts.append(w)
+        text = " ".join(parts).rstrip(".,")
+        return text.upper() if cfg.get("upper") else text
+
+    base = {"style": cfg.get("style", "caption"), "pos": cfg.get("pos", "caption"),
+            "size": cfg.get("size", 1), "_caption": True}
+    if not cfg.get("build"):
+        out.append(dict(base, text=fmt(ch), start=a, end=b))
+        return
+    for i in range(len(ch)):
+        s0 = a if i == 0 else max(a, to_tl(ch[i]["start"]))
+        e0 = b if i + 1 == len(ch) else max(s0 + 0.04, to_tl(ch[i + 1]["start"]))
+        out.append(dict(base, text=fmt(ch[:i + 1]), start=s0, end=min(e0, b)))
+
+
 def _vo_captions(tl, ad_dir, total):
     """Captions for voiceover lines, from the word timings `adstudio voice` saves."""
     from . import voice
@@ -179,12 +205,7 @@ def _vo_captions(tl, ad_dir, total):
                 b = at + chunks[k + 1][0]["start"]
             else:
                 b = at + ch[-1]["end"] + 0.18
-            text = " ".join(x["w"] for x in ch).rstrip(".,")
-            if cfg.get("upper"):
-                text = text.upper()
-            out.append({"text": text, "style": cfg.get("style", "caption"),
-                        "pos": cfg.get("pos", "caption"), "size": cfg.get("size", 1),
-                        "start": a, "end": min(b, total), "_caption": True})
+            _emit(out, cfg, ch, a, min(b, total), lambda t, at=at: at + t)
     return out
 
 
@@ -222,11 +243,5 @@ def _captions(tl, segs):
             else:
                 b = to_tl(ch[-1]["end"]) + 0.18
             b = min(b, seg["start"] + seg["dur"])
-            text = " ".join(x["w"] for x in ch).rstrip(".,")
-            if upper:
-                text = text.upper()
-            out.append({"text": text, "style": cfg.get("style", "caption"),
-                        "pos": cfg.get("pos", "caption"),
-                        "size": cfg.get("size", 1), "start": a, "end": b,
-                        "_caption": True})
+            _emit(out, cfg, ch, a, b, to_tl)
     return out
