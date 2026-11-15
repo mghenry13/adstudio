@@ -109,3 +109,7 @@ Back it up however you like; it is set up to work as its own private git repo
 - HDR phone footage is converted to standard range on the way in.
 - The Premiere XML carries cuts, reframing, text as images, and audio levels.
   It does not carry speed changes or fades.
+
+## Licence
+
+MIT. See `LICENSE`.
