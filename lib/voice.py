@@ -149,17 +149,44 @@ def words(path, text=None):
     if not text or not ws:
         return ws
     toks = text.split()
-    if len(toks) == len(ws):
+    import re as _re
+    _n = lambda x: _re.sub(r"[^a-z0-9]", "", x.lower())
+    if len(toks) == len(ws) and sum(_n(t) == _n(w["w"]) for t, w in zip(toks, ws)) >= 0.8 * len(toks):
         return [dict(w, w=t) for w, t in zip(ws, toks)]
-    # different word counts: spread the text over the spoken span by characters
-    a, b = ws[0]["start"], ws[-1]["end"]
-    total = float(sum(len(t) + 1 for t in toks))
-    res, pos = [], 0
-    for t in toks:
-        s0 = a + (b - a) * pos / total
-        pos += len(t) + 1
-        res.append({"w": t, "start": round(s0, 3), "end": round(a + (b - a) * pos / total, 3)})
-    return res
+    # Different word counts ("a hundred bucks" said, "$100" shown): line the two
+    # up on the words they share, then spread each unmatched run of shown words
+    # over the time between its neighbours.
+    import difflib, re
+    norm = lambda x: re.sub(r"[^a-z0-9]", "", x.lower())
+    # the recogniser glues words to digits ("Comment50"): split them, sharing the time
+    split = []
+    for w in ws:
+        parts = re.findall(r"[A-Za-z']+|[0-9]+", w["w"]) or [w["w"]]
+        span = (w["end"] - w["start"]) / len(parts)
+        for k, part in enumerate(parts):
+            split.append({"w": part, "start": w["start"] + span * k, "end": w["start"] + span * (k + 1)})
+    ws = split
+    sm = difflib.SequenceMatcher(None, [norm(t) for t in toks], [norm(w["w"]) for w in ws], autojunk=False)
+    timing = [None] * len(toks)
+    for blk in sm.get_matching_blocks():
+        for k in range(blk.size):
+            w = ws[blk.b + k]
+            timing[blk.a + k] = (w["start"], w["end"])
+    i = 0
+    while i < len(toks):
+        if timing[i] is not None:
+            i += 1
+            continue
+        j = i
+        while j < len(toks) and timing[j] is None:
+            j += 1
+        a = timing[i - 1][1] if i > 0 else ws[0]["start"]
+        b = timing[j][0] if j < len(toks) else ws[-1]["end"]
+        n = j - i
+        for k in range(n):
+            timing[i + k] = (a + (b - a) * k / n, a + (b - a) * (k + 1) / n)
+        i = j
+    return [{"w": t, "start": round(x[0], 3), "end": round(x[1], 3)} for t, x in zip(toks, timing)]
 
 
 def build(ad_dir, force=False):
