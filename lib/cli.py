@@ -14,8 +14,8 @@ from .util import (ADS, BRANDS, CONFIG_DIR, MEDIA, ROOT, Fail, Timer, config,
 HELP = """adstudio commands
 
   Footage
-    watch add <brand> <folder>    remember a footage or assets folder (watch list, watch remove)
-    sync [--dry-run]              find new files in watched folders; ingest, transcribe, analyze
+    watch add <brand> <folder>    add a footage or assets folder to a brand (watch list, watch remove)
+    sync [brand] [--dry-run]      only when asked: find new files in a brand's folders; ingest, transcribe, analyze
     ingest <brand> <path...>      register footage, build proxies, transcribe
     clips [brand]                 list clips
     clip <id>                     one clip: details, shot log, transcript
@@ -57,6 +57,7 @@ HELP = """adstudio commands
     setup [workspace-folder]      first run: workspace, skill, helpers
     where                         where the tool, your workspace and settings are
     brand new <name> | brand list brand kits
+    brand page [brand]            web page of a brand's rules, kit and assets
     key [gemini|runware] [--paste]  store your own API key (kept outside the repo)
     config [name value]           show or change your personal settings
     doctor                        check dependencies and keys
@@ -238,17 +239,18 @@ def cmd_watch(a):
     from . import sync
     if a and a[0] == "add" and len(a) == 3:
         sync.add(a[1], a[2])
-    elif a and a[0] == "remove" and len(a) == 2:
-        sync.remove(a[1])
+    elif a and a[0] == "remove" and len(a) == 3:
+        sync.remove(a[1], a[2])
     elif not a or a[0] == "list":
-        sync.listing()
+        sync.listing(a[1] if len(a) > 1 else None)
     else:
-        raise Fail("usage: adstudio watch add <brand> <folder> | remove <folder> | list")
+        raise Fail("usage: adstudio watch add <brand> <folder> | remove <brand> <folder> | list [brand]")
 
 
 def cmd_sync(a):
     from . import sync
-    sync.sync(dry_run="--dry-run" in a, do_analyze="--no-analyze" not in a)
+    brand = next((x for x in a if not x.startswith("--")), None)
+    sync.sync(brand, dry_run="--dry-run" in a, do_analyze="--no-analyze" not in a)
 
 
 def cmd_snapshot(a):
@@ -415,7 +417,11 @@ def cmd_setup(a):
 
 def cmd_brand(a):
     from . import setup
-    if a and a[0] == "new" and len(a) > 1:
+    if a and a[0] == "page":
+        from . import brandpage, sync
+        for b in ([a[1]] if len(a) > 1 else sync._brands()):
+            out("  " + brandpage.write(b))
+    elif a and a[0] == "new" and len(a) > 1:
         setup.brand_new(" ".join(a[1:]))
     else:
         setup.brand_list()

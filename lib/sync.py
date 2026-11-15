@@ -1,8 +1,9 @@
 """Watched folders: scan for new footage and assets, then process only those.
 
-  adstudio watch add <brand> <folder>     remember a folder
-  adstudio sync                           ingest, transcribe and analyze what is new
-  adstudio sync --dry-run                 only say what is new
+  adstudio watch add <brand> <folder>     add a folder to a brand (saved in its brand.json)
+  adstudio sync [brand]                   ingest, transcribe and analyze what is new
+  adstudio sync [brand] --dry-run         only say what is new
+Sync runs only when asked; nothing scans in the background.
 
 "New" is decided from path, size and modified time, which costs nothing even
 on a cloud drive. A file that was merely renamed or moved is recognised by
@@ -16,44 +17,79 @@ from . import analyze, media, transcribe
 from .util import (IMAGE_EXT, MEDIA, VIDEO_EXT, WORK, Fail, Timer, load_json, out,
                    save_json)
 
-SOURCES = os.path.join(WORK, "sources.json")
 SEEN = os.path.join(MEDIA, "seen.json")
+LEGACY = os.path.join(WORK, "sources.json")
 
 
-def sources():
-    return load_json(SOURCES, []) or []
+def _brand_file(brand):
+    from .util import BRANDS
+    return os.path.join(BRANDS, brand, "brand.json")
+
+
+def _brands():
+    from .util import BRANDS
+    if not os.path.isdir(BRANDS):
+        return []
+    return sorted(b for b in os.listdir(BRANDS) if os.path.exists(_brand_file(b)))
+
+
+def _migrate():
+    """Folders used to live in one workspace file; they belong to each brand."""
+    rows = load_json(LEGACY)
+    if not rows:
+        return
+    for r in rows:
+        j = load_json(_brand_file(r["brand"]))
+        if j is not None and r["path"] not in j.setdefault("folders", []):
+            j["folders"].append(r["path"])
+            save_json(_brand_file(r["brand"]), j)
+    os.unlink(LEGACY)
+
+
+def sources(brand=None):
+    """Each brand keeps its own list of footage and asset folders in its
+    brand.json, so a project's sources travel with the project."""
+    _migrate()
+    rows = []
+    for b in _brands():
+        if brand and b != brand:
+            continue
+        for p in (load_json(_brand_file(b)) or {}).get("folders", []):
+            rows.append({"brand": b, "path": os.path.expanduser(p)})
+    return rows
 
 
 def add(brand, folder):
-    from .util import BRANDS
     folder = os.path.abspath(os.path.expanduser(folder))
     if not os.path.isdir(folder):
         raise Fail("not a folder: %s" % folder)
-    if not os.path.isdir(os.path.join(BRANDS, brand)):
+    j = load_json(_brand_file(brand))
+    if j is None:
         raise Fail("unknown brand '%s' (adstudio brand list)" % brand)
-    rows = sources()
-    if any(r["path"] == folder for r in rows):
-        raise Fail("already watching %s" % folder)
-    rows.append({"brand": brand, "path": folder, "added": time.strftime("%Y-%m-%d")})
-    save_json(SOURCES, rows)
-    out("watching %s for %s" % (folder, brand))
+    if folder in j.setdefault("folders", []):
+        raise Fail("%s already has %s" % (brand, folder))
+    j["folders"].append(folder)
+    save_json(_brand_file(brand), j)
+    out("%s now includes %s" % (brand, folder))
+    out("nothing is scanned until you ask: adstudio sync %s" % brand)
 
 
-def remove(folder):
+def remove(brand, folder):
     folder = os.path.abspath(os.path.expanduser(folder))
-    rows = [r for r in sources() if r["path"] != folder]
-    if len(rows) == len(sources()):
-        raise Fail("not watching %s" % folder)
-    save_json(SOURCES, rows)
-    out("stopped watching %s (its clips stay in the catalog)" % folder)
+    j = load_json(_brand_file(brand)) or {}
+    if folder not in j.get("folders", []):
+        raise Fail("%s does not have %s" % (brand, folder))
+    j["folders"].remove(folder)
+    save_json(_brand_file(brand), j)
+    out("removed %s from %s (its clips stay in the catalog)" % (folder, brand))
 
 
-def listing():
-    rows = sources()
+def listing(brand=None):
+    rows = sources(brand)
     for r in rows:
         ok = "" if os.path.isdir(r["path"]) else "   (folder not found)"
         out("%-14s %s%s" % (r["brand"], r["path"], ok))
-    out("%d watched folders" % len(rows))
+    out("%d folders" % len(rows))
 
 
 def _walk(folder):
@@ -70,11 +106,11 @@ def _walk(folder):
             yield p, [st.st_size, int(st.st_mtime)]
 
 
-def scan():
+def scan(brand=None):
     """Returns {brand: [(path, sig)]} of files not processed before."""
     seen = load_json(SEEN, {}) or {}
     new, missing = {}, []
-    for r in sources():
+    for r in sources(brand):
         if not os.path.isdir(r["path"]):
             missing.append(r["path"])
             continue
@@ -84,15 +120,18 @@ def scan():
     return new, missing
 
 
-def sync(dry_run=False, do_analyze=True):
-    if not sources():
-        raise Fail("no watched folders yet. Add one: adstudio watch add <brand> <folder>")
+def sync(brand=None, dry_run=False, do_analyze=True):
+    """Runs only when asked. Nothing watches folders in the background."""
+    if brand and brand not in _brands():
+        raise Fail("unknown brand '%s' (adstudio brand list)" % brand)
+    if not sources(brand):
+        raise Fail("no folders yet. Add one: adstudio watch add <brand> <folder>")
     with Timer("scan", quiet=True) as t:
-        new, missing = scan()
+        new, missing = scan(brand)
     for m in missing:
         out("  skipped, folder not found: %s" % m)
     total = sum(len(v) for v in new.values())
-    out("%d new files in %d watched folders (scan %.2fs)" % (total, len(sources()), t.secs))
+    out("%d new files in %d folders (scan %.2fs)" % (total, len(sources(brand)), t.secs))
     for brand, files in sorted(new.items()):
         size = sum(s[0] for _, s in files) / 1e6
         vids = sum(1 for p, _ in files if p.lower().endswith(VIDEO_EXT))
@@ -105,7 +144,8 @@ def sync(dry_run=False, do_analyze=True):
     if dry_run:
         return
     if not total:
-        _backlog(do_analyze)
+        _backlog(do_analyze, brand)
+        _pages(brand)
         return
     seen = load_json(SEEN, {}) or {}
     metas = []
@@ -122,15 +162,22 @@ def sync(dry_run=False, do_analyze=True):
         out("  %s: %d ingested" % (brand, len(ok)))
         metas += ok
     transcribe.run_for([m for m in metas if m.get("has_audio")])
-    _backlog(do_analyze)
+    _backlog(do_analyze, brand)
+    _pages(brand)
 
 
-def _backlog(do_analyze):
+def _pages(brand):
+    from . import brandpage
+    for b in ([brand] if brand else _brands()):
+        brandpage.write(b)
+
+
+def _backlog(do_analyze, brand=None):
     """Anything in the catalog still without a shot log, including files a
     previous sync could not analyze (for example when a daily limit was hit)."""
     if not do_analyze:
         return
-    todo = [m for m in media.all_clips() if not os.path.exists(
+    todo = [m for m in media.all_clips(brand) if not os.path.exists(
         os.path.join(media.clip_dir(m["id"]), "shots.json"))]
     if todo:
         out("%d files in the catalog have no shot log yet" % len(todo))
