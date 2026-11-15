@@ -183,6 +183,33 @@ def _emit(out, cfg, ch, a, b, to_tl):
             "size": cfg.get("size", 1), "_caption": True}
     if cfg.get("track"):
         base["track"] = cfg["track"]
+    # a chunk that is just one of these words shows the image instead (a logo for a name)
+    imgs = dict((k.lower(), v) for k, v in (cfg.get("word_images") or {}).items())
+    key = lambda w: w["w"].strip(".,?!").lower()
+    if len(ch) > 1 and any(key(w) in imgs for w in ch):
+        parts, cur = [], []            # give each image word its own moment on screen
+        for w in ch:
+            if key(w) in imgs:
+                if cur:
+                    parts.append(cur)
+                parts.append([w])
+                cur = []
+            else:
+                cur.append(w)
+        if cur:
+            parts.append(cur)
+        for i, part in enumerate(parts):
+            pa = a if i == 0 else max(a, to_tl(part[0]["start"]))
+            pb = b if i + 1 == len(parts) else max(pa + 0.04, to_tl(parts[i + 1][0]["start"]))
+            _emit(out, cfg, part, pa, min(pb, b), to_tl)
+        return
+    if len(ch) == 1 and ch[0]["w"].strip(".,?!").lower() in imgs:
+        spec = imgs[ch[0]["w"].strip(".,?!").lower()]
+        if isinstance(spec, str):
+            spec = {"image": spec}
+        out.append(dict(spec, pos=spec.get("pos", base["pos"]), width=spec.get("width", 0.5),
+                        start=a, end=b, _caption=True, fade=0))
+        return
     if not cfg.get("build"):
         out.append(dict(base, text=fmt(ch), start=a, end=b))
         return
