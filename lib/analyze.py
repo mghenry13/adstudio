@@ -337,6 +337,8 @@ def run_for(metas, backend=None, note="", force=False):
     if not todo:
         out("shot logs up to date")
         return
+    if backend == "runware":
+        raise Fail("the Runware analysis backend is not built yet; analysis uses the Gemini key")
     _key()
     tin = tout = done = 0
 
@@ -355,7 +357,8 @@ def run_for(metas, backend=None, note="", force=False):
             return m, None, str(e).splitlines()[0][:200]
 
     with Timer("analyze %d files" % len(todo)):
-        with ThreadPoolExecutor(max_workers=4) as ex:
+        # free-tier keys allow only a few requests a minute: `adstudio config analyze_workers 1`
+        with ThreadPoolExecutor(max_workers=int(config().get("analyze_workers", 4))) as ex:
             for m, data, err in ex.map(work, todo):
                 if err:
                     out("  FAIL %s: %s" % (m["id"], err))

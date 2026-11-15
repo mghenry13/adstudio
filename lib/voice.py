@@ -21,7 +21,8 @@ from . import transcribe
 from .util import Fail, Timer, config, load_json, out, read_key, run, save_json, sha
 
 API = "https://api.runware.ai/v1"
-DEFAULTS = {"voice_model": "fishaudio:s2.1@pro",
+DEFAULTS = {"voice_ref": "", "voice_ref_text": "",
+            "voice_model": "fishaudio:s2.1@pro",
             "voice_id": "bf322df2096a46f18c579d0baa36f41d",   # Adrian, steady narrator
             "voice_speed": 1.0}
 STOCK = {"adrian": "bf322df2096a46f18c579d0baa36f41d",
@@ -61,12 +62,17 @@ def tts(text, dst, cfg=None):
     if not key:
         raise Fail("no Runware key yet. Run: adstudio key runware --paste")
     task = str(uuid.uuid4())
-    speech = {"text": text, "voice": cfg["voice_id"]}
+    speech = {"text": text}
+    task_extra = {}
+    if cfg.get("voice_ref"):            # clone a voice from a short clip of it
+        task_extra["inputs"] = {"referenceVoices": [_reference(cfg)]}
+    else:
+        speech["voice"] = cfg["voice_id"]
     if float(cfg.get("voice_speed", 1)) != 1:
         speech["speed"] = float(cfg["voice_speed"])
     data = _post(key, [{"taskType": "audioInference", "taskUUID": task,
                         "model": cfg["voice_model"], "speech": speech,
-                        "outputFormat": "WAV", "deliveryMethod": "async"}])
+                        "outputFormat": "WAV", "deliveryMethod": "async", **task_extra}])
     url, t0 = None, time.time()
     while not url:
         url = next((d.get("audioURL") for d in data if d.get("audioURL")), None)
@@ -85,6 +91,27 @@ def tts(text, dst, cfg=None):
          "-ar", "48000", dst])
     os.remove(tmp)
     return dst
+
+
+def _reference(cfg):
+    """voice_ref: an audio/video file, or "<clip id>@<in>-<out>"; voice_ref_text: what is said."""
+    import base64, tempfile
+    ref = str(cfg["voice_ref"])
+    if not cfg.get("voice_ref_text"):
+        raise Fail("voice_ref needs voice_ref_text (the words spoken in it)")
+    ss = []
+    if "@" in ref:
+        from . import media
+        cid, rng = ref.rsplit("@", 1)
+        a, b = (float(x) for x in rng.split("-"))
+        ref, ss = media.find(cid)["src"], ["-ss", "%.3f" % a, "-t", "%.3f" % (b - a)]
+    tmp = tempfile.mktemp(suffix=".mp3")
+    run(["ffmpeg", "-v", "error", "-y"] + ss + ["-i", ref, "-vn", "-ac", "1", "-ar", "24000",
+         "-b:a", "64k", tmp])
+    with open(tmp, "rb") as f:
+        data = base64.b64encode(f.read()).decode()
+    os.remove(tmp)
+    return {"audio": "data:audio/mpeg;base64," + data, "text": cfg["voice_ref_text"]}
 
 
 def words_path(path):
@@ -166,7 +193,7 @@ def build(ad_dir, force=False):
             if not v.get("text") and not v.get("file"):
                 raise Fail("vo line %d needs 'text', 'file' or 'clip'" % i)
             sig = sha("vo1", v.get("text"), cfg["voice_model"], cfg["voice_id"],
-                      cfg.get("voice_speed"))[:12]
+                      cfg.get("voice_speed"), cfg.get("voice_ref"))[:12]
             scratch = v.get("text") and (not v.get("file") or v.get("_sig"))
             if scratch and (force or v.get("_sig") != sig
                             or not os.path.exists(rpath(v["file"], ad_dir))):
@@ -177,4 +204,5 @@ def build(ad_dir, force=False):
                 out("  line %d  %s" % (i + 1, v["text"][:60]))
         save_json(p, tl)
         _transcribe([rpath(v["file"], ad_dir) for v in lines])
-    out("%d new, %d reused (voice %s)" % (made, len(lines) - made, cfg["voice_id"]))
+    out("%d new, %d reused (voice %s)" % (made, len(lines) - made,
+        "clone of " + cfg["voice_ref"] if cfg.get("voice_ref") else cfg["voice_id"]))
