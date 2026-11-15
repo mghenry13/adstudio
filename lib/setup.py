@@ -58,8 +58,14 @@ def setup(workspace=None):
 
     missing = [t for t in ("ffmpeg", "ffprobe", "node", "npm", "swift") if not shutil.which(t)]
     if missing:
-        out("missing tools: %s" % ", ".join(missing))
-        out("  install with Homebrew: brew install ffmpeg node   (swift comes with: xcode-select --install)")
+        out("MISSING: %s" % ", ".join(missing))
+        if "swift" in missing:
+            out("  run: xcode-select --install   (wait for it to finish)")
+        if set(missing) & set(("ffmpeg", "ffprobe", "node", "npm")):
+            out("  run: brew install ffmpeg node   (no brew? see Install in README.md)")
+        out("  then run ./adstudio setup again")
+    if not os.path.exists("/Applications/Google Chrome.app"):
+        out("MISSING: Google Chrome (https://www.google.com/chrome/), needed to draw text")
     if shutil.which("npm") and not os.path.isdir(os.path.join(ROOT, "node_modules", "playwright-core")):
         out("installing the page renderer (npm install)...")
         r = subprocess.run(["npm", "install", "--silent"], cwd=ROOT, capture_output=True, text=True)
