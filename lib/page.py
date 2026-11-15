@@ -47,7 +47,9 @@ button.go:hover{filter:brightness(1.06)}button.go:disabled{opacity:.5;cursor:def
 .tc:hover{background:color-mix(in srgb,var(--accent) 24%,transparent)}
 .tc.off,.tc.gen{background:var(--hover);color:var(--mute)}
 .tc.gen{cursor:default}
-.seg{display:flex;gap:4px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.compose.two{margin-top:8px}
+#tc{cursor:default}
 #clist,.clist{margin-top:14px}
 .fb{display:flex;gap:12px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line);white-space:pre-wrap}
 .fb .x{flex:1;min-width:0}
@@ -131,28 +133,31 @@ function addRow(text, t, id) {
   label();
 }
 if (box) {
-  const v = vidOf(box);
-  let pinned = true, at = 0;
-  const whole = $('#whole');
-  const show = () => { chip.textContent = fmt(at); chip.classList.toggle('off', !pinned); whole.classList.toggle('off', pinned);
-    box.placeholder = pinned ? 'Comment at this moment, then Enter' : 'Comment on the whole video, then Enter'; };
-  whole.addEventListener('click', () => { pinned = false; show(); box.focus(); });
+  const v = vidOf(box), boxw = $('#fbw');
+  let at = 0;
   // The timecode follows the playhead until you start typing, then it holds.
+  const show = () => { chip.textContent = fmt(at); };
   v.addEventListener('timeupdate', () => { if (!box.value.trim()) { at = v.currentTime; show(); } });
-  chip.addEventListener('click', () => { pinned = true; show(); box.focus(); });
-  try { box.value = localStorage.getItem(KEY) || ''; } catch (e) {}
-  box.addEventListener('input', () => { if (box.value.trim()) v.pause();
-    try { localStorage.setItem(KEY, box.value); } catch (e) {} });
+  [[box, KEY], [boxw, KEY + '-whole']].forEach(([el, key]) => {
+    try { el.value = localStorage.getItem(key) || ''; } catch (e) {}
+    el.addEventListener('input', () => { if (el === box && el.value.trim()) v.pause();
+      try { localStorage.setItem(key, el.value); } catch (e) {} });
+  });
+  // Adds whatever is typed in either box; with redo, then sends every comment.
   const send = async redo => {
-    const text = box.value.trim();
-    if (!text && !redo) return;
+    const items = [];
+    if (box.value.trim()) items.push([box, box.value.trim(), Math.round(at * 100) / 100, KEY]);
+    if (boxw.value.trim()) items.push([boxw, boxw.value.trim(), null, KEY + '-whole']);
+    if (!items.length && !redo) return;
     go.disabled = true;
     try {
-      const t = text && pinned ? Math.round(at * 100) / 100 : null;
-      const d = await post({text, t, redo});
-      if (text) addRow(text, t, d.added);
-      box.value = ''; try { localStorage.removeItem(KEY); } catch (e) {}
-      if (redo) { document.querySelectorAll('#clist .st.open').forEach(s => { s.className = 'st requested'; s.textContent = 'Sent to Claude'; });
+      for (const [el, text, t, key] of items) {
+        const d = await post({text, t, redo: false});
+        addRow(text, t, d.added);
+        el.value = ''; try { localStorage.removeItem(key); } catch (e) {}
+      }
+      if (redo) { await post({text: '', redo: true});
+        document.querySelectorAll('#clist .st.open').forEach(s => { s.className = 'st requested'; s.textContent = 'Sent to Claude'; });
         document.querySelectorAll('#clist .del').forEach(d => d.remove()); label(); }
       say('');
       at = v.currentTime; show();
@@ -162,10 +167,10 @@ if (box) {
     }
     go.disabled = false;
   };
-  box.addEventListener('keydown', e => {
+  [box, boxw].forEach(el => el.addEventListener('keydown', e => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); send(true); }
     else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(false); }
-  });
+  }));
   go.addEventListener('click', () => send(true));
   document.addEventListener('click', async e => {
     const d = e.target.closest('.del'); if (!d) return;
@@ -180,7 +185,7 @@ function say(t, cls) { if (msg) { msg.textContent = t; msg.className = 'msg ' + 
 async function poll() {
   try {
     const s = await (await fetch('/api/state?ad=' + encodeURIComponent(AD), {cache: 'no-store'})).json();
-    if (s.stamp && s.stamp > STAMP + 5 && !(box && box.value.trim() && document.activeElement === box)) { location.reload(); return; }
+    if (s.stamp && s.stamp > STAMP + 5 && !(box && (box.value.trim() || $('#fbw').value.trim()))) { location.reload(); return; }
     const w = $('#working');
     if (w) w.textContent = s.pending.length
       ? (s.listening ? 'Claude has this and is working on the next version. This page updates by itself.'
@@ -249,21 +254,21 @@ def write(ad_dir, tl):
         body = []
         if newest:
             n_open = sum(1 for f in fbs if f["status"] == "open")
-            body.append("<h2>Version %d <small>%s &middot; %.1fs</small></h2>" % (
-                v["n"], _when(v["at"]), v["seconds"]))
+            body.append(
+                "<div class='head'><h2>Version %d <small>%s &middot; %.1fs</small></h2>"
+                "<button class='go' id='go' data-v='%d' title='Send all comments to Claude "
+                "(Cmd+Enter)'>Redo%s</button></div>" % (
+                    v["n"], _when(v["at"]), v["seconds"], v["n"],
+                    " with %d comment%s" % (n_open, "" if n_open == 1 else "s") if n_open else ""))
             if v.get("note"):
                 body.append("<div class='note'>%s</div>" % _e(v["note"]))
             body.append(
-                "<div class='compose'><div class='seg'><button class='tc' id='tc' title='Comment on "
-                "this moment'>0:00.0</button><button class='tc off' id='whole' title='Comment on "
-                "the whole video'>Whole video</button></div>"
-                "<textarea id='fb' rows='1' placeholder='Comment at this moment, then Enter'></textarea>"
-                "<button class='go' id='go' data-v='%d' title='Send all comments to Claude "
-                "(Cmd+Enter)'>Redo%s</button></div>"
+                "<div class='compose'><span class='tc' id='tc'>0:00.0</span>"
+                "<textarea id='fb' rows='1' placeholder='Comment at this moment, then Enter'></textarea></div>"
+                "<div class='compose two'><span class='tc gen'>Whole video</span>"
+                "<textarea id='fbw' rows='1' placeholder='Comment on the whole video, then Enter'></textarea></div>"
                 "<div class='msg' id='msg'></div><div class='msg' id='working'></div>"
-                "<span id='chead' hidden></span><div id='clist'>%s</div>" % (
-                    v["n"], " with %d comment%s" % (n_open, "" if n_open == 1 else "s")
-                    if n_open else "", rows))
+                "<div id='clist'>%s</div>" % rows)
         elif v.get("note"):
             body.append("<div class='note'>%s</div>" % _e(v["note"]))
         if not newest and rows:
