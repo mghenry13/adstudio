@@ -54,6 +54,14 @@ class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
         path = posixpath.normpath(urllib.parse.unquote(path.split("?", 1)[0].split("#", 1)[0]))
         parts = [p for p in path.split("/") if p and p not in (".", "..")]
+        # Two narrow extras: the shared text styles, and per-clip thumbnails
+        # and proxies for the brand page. Nothing else under media/ is served.
+        if parts == ["tool", "overlay.css"]:
+            from .util import TEMPLATES
+            return os.path.join(TEMPLATES, "overlay.css")
+        if (len(parts) == 4 and parts[:2] == ["media", "clips"]
+                and parts[3] in ("thumb.jpg", "proxy.mp4") and not parts[2].startswith(".")):
+            return os.path.join(WORK, *parts)
         if not parts or parts[0] not in SERVED or any(p.startswith(".") for p in parts):
             return os.path.join(WORK, "__nope__")
         return os.path.join(WORK, *parts)

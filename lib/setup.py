@@ -22,6 +22,7 @@ ads/*/*/versions/*.mp4
 ads/*/*/preview.html
 ads/*/*/render.json
 ads/*/*/gfx/*/render-*.mov
+brands/*/index.html
 .DS_Store
 """
 LESSONS = """# Lessons

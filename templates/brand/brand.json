@@ -4,5 +4,7 @@
   "tagline": "",
   "cta": "Learn more",
   "logo": "",
+  "rules": [],
+  "folders": [],
   "notes": "Starter kit. Put real colours and fonts in brand.css, drop a logo file in this folder and name it in \"logo\"."
 }

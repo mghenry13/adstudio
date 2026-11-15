@@ -46,14 +46,23 @@ colours, fonts, logo). Font files go in the kit's `fonts/` folder and are
 declared with `@font-face` in `brand.css`. Never invent brand colours or
 fonts: ask, or read them from the brand's own site.
 
+Brand rules the user states ("never show prices", "always end on the logo")
+go in the `rules` list in that brand's `brand.json`, and you follow them for
+every ad for that brand. `adstudio brand page <brand>` writes the brand's
+web page (rules, colours, fonts, logos, folders, ads, every asset with its
+id) at `http://localhost:<port>/brands/<brand>/index.html`; point the user
+there when they want to browse assets or look up an id.
+
 ## Workflow
 
 1. `adstudio clips <brand>` and `adstudio search <words>` to find moments.
    `adstudio clip <id>` shows a clip's shot log and timed transcript.
-   New footage: `adstudio sync` picks up anything new in the watched folders
-   (`adstudio watch list`; add one with `watch add <brand> <folder>`) and
-   ingests, transcribes and analyzes only the new files. `sync --dry-run`
-   shows what is new first. One-off folders: `adstudio ingest <brand> <folder>`.
+   Each brand keeps its own footage and asset folders (in its `brand.json`;
+   `adstudio watch list`, `watch add <brand> <folder>`).
+   `adstudio sync <brand>` ingests, transcribes and analyzes only what is new
+   there. **Run sync only when the user asks for it**: it costs API calls
+   and can pull large files down from a cloud drive. `sync --dry-run` shows
+   what is new without doing anything. One-off: `adstudio ingest <brand> <folder>`.
    If Gemini reports a daily limit, say so plainly; sync resumes where it stopped.
 2. `adstudio new <brand> <ad>` then write `ads/<brand>/<ad>/timeline.json`.
    Cut on word timings from the transcript, not on guesses.
