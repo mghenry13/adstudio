@@ -16,16 +16,16 @@ from . import media
 from .util import ADS, BRANDS, WORK, Fail, Timer, config, load_json, out, run
 
 CSS = """
-:root{--bg:#f4f1ec;--card:#fff;--ink:#16181b;--mute:#6b7076;--line:#e2ddd5;--accent:#c8501e}
-@media (prefers-color-scheme:dark){:root{--bg:#131517;--card:#1c1f22;--ink:#e8e6e1;--mute:#8e949a;--line:#2b2f33;--accent:#f0794a}}
+:root{--bg:#fafaf9;--card:#fff;--ink:#18181b;--mute:#71717a;--line:#e7e5e4;--accent:#e4572e}
+@media (prefers-color-scheme:dark){:root{--bg:#0e0e10;--card:#161618;--ink:#f4f4f5;--mute:#a1a1aa;--line:#27272b;--accent:#ff7a50}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
 .wrap{max-width:1180px;margin:0 auto;padding:22px 24px 80px}
 h1{font-size:18px;margin:0;font-weight:650}
 .sub{color:var(--mute);font-size:13px;margin-top:2px}
 nav{margin:14px 0 6px;display:flex;gap:14px;flex-wrap:wrap;font-size:13px}
-nav a{color:var(--mute)}
-h2{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--mute);margin:34px 0 10px;font-weight:600}
+nav a{color:var(--mute);text-decoration:none;border-bottom:1px solid var(--line)}nav a:hover{color:var(--ink)}
+h2{font-size:12.5px;color:var(--mute);margin:34px 0 10px;font-weight:400}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
 .kv{display:grid;grid-template-columns:130px 1fr;gap:6px 14px}
 .kv dt{color:var(--mute)}.kv dd{margin:0;overflow-wrap:anywhere}

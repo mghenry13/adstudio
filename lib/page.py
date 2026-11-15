@@ -7,90 +7,106 @@ saves comments through `adstudio serve` and reloads when a new version lands.
 import html
 import json
 import os
+import re
 import time
 
 from . import versions
 
 CSS = """
-:root{--bg:#fafaf9;--panel:#fff;--ink:#18181b;--mute:#71717a;--faint:#a1a1aa;--line:#e7e5e4;--hover:#f4f4f5;--accent:#e4572e;--ok:#15803d;--warn:#b45309;--cta:#16a34a;--cta-ink:#fff}
-@media (prefers-color-scheme:dark){:root{--bg:#0f0f10;--panel:#17171a;--ink:#f4f4f5;--mute:#a1a1aa;--faint:#63636b;--line:#26262b;--hover:#1f1f23;--accent:#ff7a50;--ok:#4ade80;--warn:#fbbf24;--cta:#22c55e;--cta-ink:#052e16}}
+:root{--bg:#fafaf9;--panel:#fff;--ink:#18181b;--mute:#71717a;--faint:#a1a1aa;--line:#e7e5e4;--hover:#f4f4f5;--accent:#e4572e;--ok:#15803d;--warn:#b45309;--cta:#16a34a}
+@media (prefers-color-scheme:dark){:root{--bg:#0e0e10;--panel:#161618;--ink:#f4f4f5;--mute:#a1a1aa;--faint:#63636b;--line:#27272b;--hover:#1e1e22;--accent:#ff7a50;--ok:#4ade80;--warn:#fbbf24;--cta:#22c55e}}
 *{box-sizing:border-box}
 html{-webkit-font-smoothing:antialiased}
-body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.55 ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
-header{max-width:1120px;margin:0 auto;padding:26px 28px 18px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;flex-wrap:wrap}
-h1{font-size:16px;margin:0;font-weight:600;letter-spacing:0}
-.sub{color:var(--mute);font-size:13px;margin-left:10px;font-weight:400}
-.finals{font-size:13px;color:var(--mute);display:flex;gap:14px}
-.finals a{color:var(--mute);text-decoration:none;border-bottom:1px solid var(--line)}
-.finals a:hover{color:var(--ink)}
-main{max-width:1120px;margin:0 auto;padding:0 28px 80px}
-.v{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:36px;align-items:start}
-.v.latest{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}
-@media (max-width:760px){.v{grid-template-columns:1fr;gap:20px}header,main{padding-left:16px;padding-right:16px}}
-video{width:100%;border-radius:12px;background:#000;display:block;max-height:76vh}
-.tabs{display:flex;gap:4px;margin-top:10px}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.6 ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace}
+a{color:inherit}
+header{max-width:1180px;margin:0 auto;padding:22px 28px 16px;display:flex;justify-content:space-between;align-items:baseline;gap:20px;flex-wrap:wrap}
+h1{font-size:15px;margin:0;font-weight:600}
+.sub{color:var(--mute);font-size:12.5px;margin-left:12px;font-weight:400}
+.sub a{text-decoration:none;border-bottom:1px solid var(--line)}.sub a:hover{color:var(--ink)}
+.finals{font-size:12.5px;color:var(--mute);display:flex;gap:14px}
+.finals a{text-decoration:none;border-bottom:1px solid var(--line)}.finals a:hover{color:var(--ink)}
+main{max-width:1180px;margin:0 auto;padding:0 28px 90px}
+.v{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:40px;align-items:start}
+.v.latest{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px}
+.v.latest .stage{position:sticky;top:20px}
+@media (max-width:780px){.v{grid-template-columns:1fr;gap:20px}.v.latest .stage{position:static}header,main{padding-left:16px;padding-right:16px}}
+video{width:100%;border-radius:12px;background:#000;display:block;max-height:calc(100vh - 120px)}
+.marks{position:relative;height:14px;margin:8px 16px 0}
+.marks:empty{display:none}
+.marks i{position:absolute;top:2px;width:9px;height:9px;margin-left:-4.5px;border-radius:50%;background:var(--accent);cursor:pointer;transition:transform .12s}
+.marks i:hover{transform:scale(1.5)}
+.marks i.done{background:var(--faint)}
+.marks i.chg{background:none;border:2px solid var(--cta);border-radius:2px;transform:rotate(45deg);width:8px;height:8px;margin-left:-4px;top:3px}
+.marks i.chg:hover{transform:rotate(45deg) scale(1.4)}
+.tabs{display:flex;gap:4px;margin-top:8px}
 .tabs button{font:inherit;font-size:12px;padding:3px 10px;border-radius:7px;border:0;background:none;color:var(--mute);cursor:pointer}
 .tabs button:hover{background:var(--hover)}
-.tabs button.on{background:var(--hover);color:var(--ink);font-weight:500}
-h2{font-size:14px;margin:0;font-weight:600;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;letter-spacing:0}
-h2 small,summary small{font-size:13px;color:var(--mute);font-weight:400}
-.note{color:var(--mute);margin-top:4px}
-.compose{display:flex;gap:10px;align-items:center;margin-top:18px;padding:6px 6px 6px 10px;border:1px solid var(--line);border-radius:12px;background:var(--bg)}
-.compose:focus-within{border-color:var(--faint)}
-textarea{flex:1;min-width:0;height:34px;min-height:34px;max-height:160px;font:inherit;color:inherit;background:none;border:0;padding:6px 0;resize:none;outline:none}
+.tabs button.on{background:var(--hover);color:var(--ink)}
+h2{font-size:14px;margin:0;font-weight:600;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+h2 small{font-size:12.5px;color:var(--mute);font-weight:400}
+.lead{margin:8px 0 0;color:var(--ink);font-size:13.5px;line-height:1.6;max-width:70ch}
+.tc{font:500 12px ui-monospace,SFMono-Regular,Menlo,monospace;padding:3px 7px;border-radius:6px;border:0;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);cursor:pointer;white-space:nowrap;flex:none}
+button.tc:hover{background:color-mix(in srgb,var(--accent) 26%,transparent)}
+.tc.gen{background:var(--hover);color:var(--mute);cursor:default}
+#tc{cursor:default}
+.tc.chgt{background:color-mix(in srgb,var(--cta) 15%,transparent);color:var(--cta)}
+button.tc.chgt:hover{background:color-mix(in srgb,var(--cta) 28%,transparent)}
+details.chg{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+details.chg+details.chg{margin-top:8px}
+details.chg summary{list-style:none;cursor:pointer;padding:9px 12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:var(--mute);font-size:12.5px}
+details.chg summary::-webkit-details-marker{display:none}
+details.chg summary>span:first-child::before{content:"+";display:inline-block;width:14px;color:var(--faint)}
+details.chg[open] summary>span:first-child::before{content:"\\2212"}
+details.chg summary:hover{background:var(--hover)}
+.jumps{display:flex;gap:5px;flex-wrap:wrap}
+details.chg ul{list-style:none;margin:0;padding:4px 12px 10px;border-top:1px solid var(--line)}
+details.chg li{display:flex;gap:10px;align-items:baseline;padding:5px 0;font-size:12.5px}
+details.chg li>span:last-child{min-width:0;overflow-wrap:anywhere}
+details.ans .fb{padding:8px 12px}
+details.ans .fb:first-of-type{border-top:1px solid var(--line)}
+.compose{display:flex;gap:10px;align-items:flex-start;margin-top:22px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--bg);transition:border-color .12s}
+.compose.two{margin-top:8px}
+.compose:focus-within{border-color:var(--mute)}
+.compose .tc{margin-top:3px}
+textarea{flex:1;min-width:0;height:26px;min-height:26px;max-height:180px;font:inherit;color:inherit;background:none;border:0;padding:3px 0;resize:none;outline:none;overflow:hidden}
 textarea::placeholder{color:var(--faint)}
-button.go{font:inherit;font-size:13.5px;font-weight:600;padding:7px 14px;border-radius:9px;border:0;background:var(--cta);color:var(--cta-ink);cursor:pointer;white-space:nowrap}
-button.go:hover{filter:brightness(1.06)}button.go:disabled{opacity:.5;cursor:default}
-.msg{font-size:12.5px;color:var(--mute);margin-top:8px;min-height:1em}
-.msg.warn{color:var(--warn)}.msg.ok{color:var(--ok)}.msg:empty{display:none}
-.tc{font:500 12px ui-monospace,SFMono-Regular,Menlo,monospace;padding:3px 7px;border-radius:6px;border:0;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);cursor:pointer;white-space:nowrap}
-.tc:hover{background:color-mix(in srgb,var(--accent) 24%,transparent)}
-.tc.off,.tc.gen{background:var(--hover);color:var(--mute)}
-.tc.gen{cursor:default}
-.hint{font-size:12.5px;color:var(--mute);margin-top:14px;padding:10px 12px;border-radius:10px;background:var(--hover)}
+.msg{font-size:12.5px;color:var(--mute);margin-top:8px}.msg.warn{color:var(--warn)}.msg:empty{display:none}
+#clist,.clist{margin-top:10px}
+.fb{display:flex;gap:12px;align-items:baseline;padding:10px 8px;margin:0 -8px;border-radius:8px;white-space:pre-wrap}
+.fb+.fb{border-top:1px solid var(--line);border-top-left-radius:0;border-top-right-radius:0}
+.fb[data-t]{cursor:pointer}
+.fb:hover{background:var(--hover)}
+.fb.now{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+.fb .x{flex:1;min-width:0;overflow-wrap:anywhere}
+.fb .st{display:block;font-size:11.5px;margin-top:1px;color:var(--faint)}
+.fb .st.done{color:var(--ok)}
+.fb.done .x{color:var(--mute)}
+.del{border:0;background:none;color:var(--faint);cursor:pointer;font-size:15px;line-height:1;padding:2px 5px;border-radius:5px;opacity:0}
+.fb:hover .del{opacity:1}.del:hover{color:var(--ink);background:var(--line)}
+.hint{font-size:12.5px;color:var(--mute);margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--hover)}
 .hint:empty{display:none}
 .hint b{color:var(--ink);font-weight:600}
-.compose.two{margin-top:8px}
-#tc{cursor:default}
-#clist,.clist{margin-top:14px}
-.fb{display:flex;gap:12px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line);white-space:pre-wrap}
-.fb .x{flex:1;min-width:0}
-.fb .st{display:block;font-size:12px;margin-top:2px;color:var(--faint)}
-.fb .st.requested{color:var(--warn)}.fb .st.done{color:var(--ok)}
-.del{border:0;background:none;color:var(--faint);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;border-radius:5px;opacity:0}
-.fb:hover .del{opacity:1}.del:hover{color:var(--ink);background:var(--hover)}
-.marks{position:relative;height:12px;margin:8px 16px 0}
-.marks:empty{display:none}
-.marks i{position:absolute;top:1px;width:9px;height:9px;margin-left:-4.5px;border-radius:50%;background:var(--accent);cursor:pointer}
-.marks i.done{background:var(--ok)}
-.sec{margin-top:20px;font-size:13.5px}
-.sec h3{font-size:12px;color:var(--mute);margin:0 0 6px;font-weight:500}
-ul{margin:0;padding-left:17px;color:var(--ink)}li{margin:2px 0}
-.answers{color:var(--mute);white-space:pre-wrap;border-left:2px solid var(--line);padding-left:12px}
-.jumps{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:18px;font-size:12.5px;color:var(--mute)}
-.jumps span{margin-right:4px}
-.tc.chgt{background:color-mix(in srgb,var(--cta) 16%,transparent);color:var(--cta)}
-.tc.chgt:hover{background:color-mix(in srgb,var(--cta) 28%,transparent)}
-details.chg li{list-style:none;margin:6px 0}
-details.chg ul{padding-left:0}
-details.chg{border:0;margin-top:20px;font-size:12.5px}
-details.chg summary{padding:6px 0;font-weight:400;color:var(--mute)}
-details.chg summary:hover{background:none;color:var(--ink)}
-details.chg ul{margin-top:4px}
-.older{margin-top:34px}
-.older>h3{font-size:12px;color:var(--mute);font-weight:500;margin:0 0 4px}
-details{border-top:1px solid var(--line)}
-details:last-child{border-bottom:1px solid var(--line)}
-summary{list-style:none;cursor:pointer;padding:13px 4px;display:flex;gap:12px;align-items:baseline;font-weight:500}
-summary::-webkit-details-marker{display:none}
-summary:hover{background:var(--hover)}
-summary::before{content:"\\203A";color:var(--faint);display:inline-block;width:10px;transition:transform .15s}
-details[open] summary::before{transform:rotate(90deg)}
-details .v{padding:8px 4px 26px}
-.newv{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:5;font:inherit;font-size:13.5px;font-weight:600;padding:9px 18px;border-radius:99px;border:0;background:var(--ink);color:var(--bg);cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.25)}
+.keys{margin-top:16px;font-size:11.5px;color:var(--faint);display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+kbd{font:inherit;padding:1px 5px;border:1px solid var(--line);border-radius:5px;color:var(--mute);margin-left:8px}
+kbd:first-child{margin-left:0}kbd+kbd{margin-left:2px}
+.older{margin-top:36px}
+.older>h3{font-size:12px;color:var(--mute);font-weight:400;margin:0 0 6px}
+details.ver{border-top:1px solid var(--line)}
+details.ver:last-child{border-bottom:1px solid var(--line)}
+details.ver>summary{list-style:none;cursor:pointer;padding:11px 6px;display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:14px;align-items:baseline}
+details.ver>summary::-webkit-details-marker{display:none}
+details.ver>summary:hover{background:var(--hover)}
+details.ver>summary b{font-weight:600}
+details.ver>summary .sn{color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+details.ver[open]>summary .sn{white-space:normal}
+details.ver>summary small{color:var(--faint);font-size:12px;white-space:nowrap}
+details.ver .v{padding:10px 6px 28px}
+.newv{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:5;font:inherit;font-size:13px;font-weight:600;padding:9px 18px;border-radius:99px;border:0;background:var(--cta);color:#04130a;cursor:pointer;box-shadow:0 8px 28px rgba(0,0,0,.3)}
 .newv[hidden]{display:none}
 .empty{background:var(--panel);border:1px dashed var(--line);border-radius:16px;padding:24px;color:var(--mute)}
-code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace}
+code{font:inherit}
+:focus-visible{outline:2px solid var(--mute);outline-offset:2px;border-radius:6px}
+textarea:focus-visible{outline:none}
 """
 
 JS = """
@@ -142,13 +158,33 @@ async function send(el) {
   try {
     const d = await post({text, t});
     addRow(text, t, d.added);
-    el.value = ''; try { localStorage.removeItem(el === box ? KEY : KEY + '-whole'); } catch (e) {}
+    el.value = ''; grow(el); try { localStorage.removeItem(el === box ? KEY : KEY + '-whole'); } catch (e) {}
     say('');
     if (el === box) { at = vidOf(box).currentTime; chip.textContent = fmt(at); }
   } catch (e) {
     say('Could not save. Is the preview server running? (adstudio serve) ' + e.message, 'warn');
   }
 }
+
+// Earlier versions load their video only when first used.
+function wake(v) { if (v && !v.getAttribute('src') && v.dataset.src) { v.src = v.dataset.src; v.load(); } }
+document.addEventListener('toggle', e => {
+  if (e.target.matches && e.target.matches('details.ver') && e.target.open) wake(e.target.querySelector('video'));
+}, true);
+// Keys, when not typing: space plays, arrows step a second, comma and
+// period step a frame, C starts a comment at the current moment.
+document.addEventListener('keydown', e => {
+  if ((e.target.closest && e.target.closest('textarea, input')) || e.metaKey || e.ctrlKey || e.altKey) return;
+  const v = document.querySelector('.v.latest video'); if (!v) return;
+  const step = d => { v.pause(); v.currentTime = Math.max(0, Math.min(v.duration || 1e9, v.currentTime + d)); };
+  if (e.key === ' ') { e.preventDefault(); v.paused ? v.play() : v.pause(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+  else if (e.key === ',') step(-1 / 30);
+  else if (e.key === '.') step(1 / 30);
+  else if (e.key === 'c' || e.key === 'C') { e.preventDefault(); v.pause(); if (box) box.focus(); }
+});
+const grow = el => { el.style.height = 'auto'; el.style.height = Math.min(180, el.scrollHeight) + 'px'; };
 
 // Clicks are handled once for the whole page, so they keep working after
 // a new version is swapped in.
@@ -158,8 +194,11 @@ document.addEventListener('click', async e => {
     v.src = tab.dataset.src; v.currentTime = pos; if (playing) v.play();
     t.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === tab)); return; }
   const s = e.target.closest('[data-seek]');
-  if (s) { const v = vidOf(s); v.currentTime = +s.dataset.seek; v.pause(); return; }
+  if (s) { const v = vidOf(s); wake(v); v.currentTime = +s.dataset.seek; v.pause(); return; }
   if (e.target.closest('#newv')) { swap(); return; }
+  const row = e.target.closest('.fb[data-t]');
+  if (row && !e.target.closest('.del') && +row.dataset.t < 1e8) {
+    const v = vidOf(row); wake(v); v.currentTime = +row.dataset.t; v.pause(); return; }
   const d = e.target.closest('.del');
   if (d) { try { await post({text: '', delete: +d.dataset.at});
       const m = document.querySelector('.marks i[data-at="' + d.dataset.at + '"]'); if (m) m.remove();
@@ -175,7 +214,12 @@ function init() {
   const v = vidOf(box);
   at = 0;
   // The timecode follows the playhead until you start typing, then it holds.
-  v.addEventListener('timeupdate', () => { if (!box.value.trim()) { at = v.currentTime; chip.textContent = fmt(at); } });
+  v.addEventListener('timeupdate', () => {
+    if (!box.value.trim()) { at = v.currentTime; chip.textContent = fmt(at); }
+    // Light up the comment that belongs to what is on screen.
+    document.querySelectorAll('.v.latest .fb[data-t]').forEach(r => {
+      const t = +r.dataset.t; r.classList.toggle('now', t < 1e8 && v.currentTime >= t - 0.15 && v.currentTime < t + 1.5); });
+  });
   // A half-typed timecode comment keeps its moment across a reload.
   try { const saved = parseFloat(localStorage.getItem(KEY + '-at'));
     if ((localStorage.getItem(KEY) || '').trim() && !isNaN(saved)) { at = saved;
@@ -183,7 +227,9 @@ function init() {
       if (v.readyState >= 1) v.currentTime = saved; } } catch (e) {}
   [[box, KEY], [boxw, KEY + '-whole']].forEach(([el, key]) => {
     try { el.value = localStorage.getItem(key) || ''; } catch (e) {}
+    grow(el);
     el.addEventListener('input', () => {
+      grow(el);
       if (el === box) { if (el.value.trim()) v.pause(); try { localStorage.setItem(KEY + '-at', at); } catch (e) {} }
       try { localStorage.setItem(key, el.value); } catch (e) {} });
     el.addEventListener('keydown', e => {
@@ -197,12 +243,13 @@ function init() {
 // swaps the page content in place, with no reload. Typed text is kept.
 function swap() {
   if (!fresh) return;
-  const open = [...document.querySelectorAll('.older details[open] > summary')].map(x => x.dataset.n);
+  const open = [...document.querySelectorAll('details.ver[open] > summary')].map(x => x.dataset.n);
   // Set as HTML rather than moving nodes: a <video> parsed in a detached
   // document never starts loading when it is moved into the page.
   $('main').innerHTML = fresh.doc.querySelector('main').innerHTML;
   $('header').innerHTML = fresh.doc.querySelector('header').innerHTML;
-  document.querySelectorAll('main video').forEach(v => v.load());
+  document.querySelectorAll('main video[src]').forEach(v => v.load());
+  document.querySelectorAll('details.ver[open] video').forEach(wake);
   open.forEach(n => { const d = document.querySelector('summary[data-n="' + n + '"]'); if (d) d.parentElement.open = true; });
   STAMP = fresh.stamp; fresh = null;
   $('#newv').hidden = true;
@@ -248,7 +295,7 @@ def _when(t):
     return time.strftime("%b %d, %H:%M", time.localtime(t))
 
 
-def _video(files, base, feedback=None, seconds=1.0):
+def _video(files, base, feedback=None, seconds=1.0, changes=None, lazy=False):
     keys = list(files)
     if not keys:
         return ""
@@ -258,14 +305,18 @@ def _video(files, base, feedback=None, seconds=1.0):
         tabs = "<div class='tabs'>%s</div>" % "".join(
             "<button class='%s' data-src='%s'>%s</button>" % ("on" if i == 0 else "", src(k), k)
             for i, k in enumerate(keys))
+    pct = lambda t: 100.0 * t / max(seconds, 0.1)
     marks = "".join(
+        "<i class='chg' style='left:%.2f%%' data-seek='%s' title='Changed: %s'></i>" % (
+            pct(t), t, _e(c)) for c, t in (changes or []) if t is not None)
+    marks += "".join(
         "<i class='%s' style='left:%.2f%%' data-seek='%s' data-at='%s' title='%s'></i>" % (
-            "done" if f.get("status") == "done" else "", 100.0 * f["t"] / max(seconds, 0.1),
-            f["t"], f["at"], _e(f["text"]))
+            "done" if f.get("status") == "done" else "", pct(f["t"]), f["t"], f["at"], _e(f["text"]))
         for f in (feedback or []) if f.get("t") is not None)
-    return ("<div><video src='%s' controls loop playsinline preload='metadata'></video>"
-            "<div class='marks' title='Comments on the timeline'>%s</div>%s</div>") % (
-        src(keys[0]), marks, tabs)
+    # Earlier versions stay unloaded until opened, so a long history is instant.
+    vid = ("<video data-src='%s' controls loop playsinline preload='none'></video>" if lazy
+           else "<video src='%s' controls loop playsinline preload='metadata'></video>") % src(keys[0])
+    return "<div class='stage'>%s<div class='marks'>%s</div>%s</div>" % (vid, marks, tabs)
 
 
 def write(ad_dir, tl):
@@ -291,12 +342,51 @@ def write(ad_dir, tl):
                 else ("Still waiting, from version %d" % f["from"] if f.get("from") else "Waiting"),
                 "<button class='del' data-at='%d' title='Delete'>&times;</button>" % f["at"]
                 if f["status"] in waiting and newest else "") for f in fbs)
-        body = []
+        nch = len(v["changes"])
+        cts = list(v.get("change_times") or []) + [None] * nch
+        pairs = list(zip(v["changes"], cts))
+        body = ["<h2>Version %d <small>%s &middot; %.1fs</small></h2>" % (
+            v["n"], _when(v["at"]), v["seconds"])]
+        if v.get("note"):
+            body.append("<p class='lead'>%s</p>" % _e(v["note"]))
+        # 1. What is different, and where to look.
+        seen, jumps = set(), []
+        for c, t in sorted(pairs, key=lambda x: (x[1] is None, x[1] or 0)):
+            if t is None or round(t, 1) in seen:
+                continue
+            seen.add(round(t, 1))
+            here = [x for x, y in pairs if y is not None and round(y, 1) == round(t, 1)]
+            jumps.append("<button class='tc chgt' data-seek='%s' title='%s'>%s</button>" % (
+                t, _e("\n".join(here)), versions.tc(t)))
+        first = v["changes"] == ["First version"]
+        if not first:
+            body.append(
+                "<details class='chg'><summary><span>%d change%s</span>%s</summary><ul>%s</ul></details>" % (
+                    nch, "" if nch == 1 else "s",
+                    "<span class='jumps'>%s</span>" % "".join(jumps) if jumps else "",
+                    "".join("<li>%s<span>%s</span></li>" % (
+                        "<button class='tc chgt' data-seek='%s'>%s</button>" % (t, versions.tc(t))
+                        if t is not None else "<span class='tc gen'>All</span>", _e(c))
+                        for c, t in pairs)))
+        # 2. Which of your comments this version answered.
+        if v.get("answers"):
+            done_rows = []
+            for line in v["answers"].split("\n"):
+                m = re.match(r"^(\d+):(\d+(?:\.\d+)?)\s{2}(.*)$", line)
+                if m:
+                    t = int(m.group(1)) * 60 + float(m.group(2))
+                    done_rows.append("<div class='fb done' data-t='%s'><button class='tc' data-seek='%s'>%s"
+                                     "</button><div class='x'>%s</div></div>" % (
+                                         t, t, versions.tc(t), _e(m.group(3))))
+                else:
+                    done_rows.append("<div class='fb done'><span class='tc gen'>Whole video</span>"
+                                     "<div class='x'>%s</div></div>" % _e(
+                                         re.sub(r"^Whole video\s{2}", "", line)))
+            body.append("<details class='chg ans'><summary><span>%d comment%s addressed</span></summary>"
+                        "%s</details>" % (len(done_rows), "" if len(done_rows) == 1 else "s",
+                                          "".join(done_rows)))
+        # 3. Your turn.
         if newest:
-            body.append("<h2>Version %d <small>%s &middot; %.1fs</small></h2>" % (
-                v["n"], _when(v["at"]), v["seconds"]))
-            if v.get("note"):
-                body.append("<div class='note'>%s</div>" % _e(v["note"]))
             body.append(
                 "<div class='compose'><span class='tc' id='tc'>0:00.0</span>"
                 "<textarea id='fb' rows='1' placeholder='Comment at this moment, then Enter'></textarea></div>"
@@ -304,43 +394,24 @@ def write(ad_dir, tl):
                 "<textarea id='fbw' rows='1' placeholder='Comment on the whole video, then Enter'></textarea></div>"
                 "<div class='msg' id='msg'></div>"
                 "<div id='clist' data-v='%d'>%s</div>"
-                "<div class='hint' id='hint'></div>" % (v["n"], rows))
-        elif v.get("note"):
-            body.append("<div class='note'>%s</div>" % _e(v["note"]))
-        if not newest and rows:
+                "<div class='hint' id='hint'></div>"
+                "<div class='keys'><kbd>Space</kbd> play <kbd>&larr;</kbd><kbd>&rarr;</kbd> 1s "
+                "<kbd>,</kbd><kbd>.</kbd> frame <kbd>C</kbd> comment</div>" % (v["n"], rows))
+        elif rows:
             body.append("<div class='clist'>%s</div>" % rows)
-        if v.get("answers"):
-            body.append("<div class='sec'><h3>Your notes on version %d</h3>"
-                        "<div class='answers'>%s</div></div>" % (v["n"] - 1, _e(v["answers"])))
-        nch = len(v["changes"])
-        cts = list(v.get("change_times") or []) + [None] * nch
-        # Jump chips: one per distinct moment that changed, in order.
-        seen, jumps = set(), []
-        for c, t in sorted(zip(v["changes"], cts), key=lambda x: (x[1] is None, x[1] or 0)):
-            if t is None or round(t, 1) in seen:
-                continue
-            seen.add(round(t, 1))
-            here = [x for x, y in zip(v["changes"], cts) if y is not None and round(y, 1) == round(t, 1)]
-            jumps.append("<button class='tc chgt' data-seek='%s' title='%s'>%s</button>" % (
-                t, _e("\n".join(here)), versions.tc(t)))
-        if jumps:
-            body.append("<div class='jumps'><span>Jump to changes</span>%s</div>" % "".join(jumps))
-        body.append("<details class='chg'><summary>What changed <small>%d change%s</small></summary>"
-                    "<ul>%s</ul></details>" % (nch, "" if nch == 1 else "s", "".join(
-                        "<li>%s%s</li>" % (
-                            "<button class='tc chgt' data-seek='%s'>%s</button> " % (t, versions.tc(t))
-                            if t is not None else "", _e(c))
-                        for c, t in zip(v["changes"], cts))))
-        card = "<section class='v%s'>%s<div>%s</div></section>" % (
+        card = "<section class='v%s'>%s<div class='side'>%s</div></section>" % (
             " latest" if newest else "",
-            _video(files, "versions", v.get("feedback"), v.get("seconds", 1.0)), "".join(body))
+            _video(files, "versions", v.get("feedback"), v.get("seconds", 1.0),
+                   changes=pairs, lazy=not newest), "".join(body))
         if newest:
             cards.append(card)
         else:
-            nc, nf = len(v["changes"]), len(fbs)
-            older.append("<details><summary data-n='%d'>Version %d <small>%s &middot; %d change%s%s</small>"
-                         "</summary>%s</details>" % (
-                             v["n"], v["n"], _when(v["at"]), nc, "" if nc == 1 else "s",
+            nf = len(fbs)
+            older.append("<details class='ver'><summary data-n='%d'><b>Version %d</b>"
+                         "<span class='sn'>%s</span><small>%s%s</small></summary>%s</details>" % (
+                             v["n"], v["n"], _e(v.get("note") or "%d change%s" % (
+                                 nch, "" if nch == 1 else "s")),
+                             _when(v["at"]),
                              " &middot; %d comment%s" % (nf, "" if nf == 1 else "s") if nf else "",
                              card))
     if older:
@@ -371,10 +442,10 @@ def write(ad_dir, tl):
     page = ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1'>"
             "<title>%s &middot; adstudio versions</title><style>%s</style></head><body>"
-            "<header><h1>%s<span class='sub'>%s &middot; %d version%s</span></h1>%s</header>"
+            "<header><h1>%s<span class='sub'><a href='/brands/%s/index.html'>%s</a> &middot; %d version%s</span></h1>%s</header>"
             "<main>%s</main><button id='newv' class='newv' hidden></button>"
             "<script>%s</script></body></html>") % (
-        _e(name), CSS, _e(name), _e(tl.get("brand", "")), len(h),
+        _e(name), CSS, _e(name), _e(tl.get("brand", "")), _e(tl.get("brand", "")), len(h),
         "" if len(h) == 1 else "s", finals, "".join(cards),
         JS % {"ad": json.dumps(ad_ref), "stamp": 0})
     dst = os.path.join(ad_dir, "preview.html")
