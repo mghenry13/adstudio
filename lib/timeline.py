@@ -100,9 +100,13 @@ def resolve(ad_dir, aspect):
         segs.append(seg)
     total = pos / float(fps)
 
+    caps = sorted(_captions(tl, segs) + _vo_captions(tl, ad_dir, pos / float(fps)),
+                  key=lambda c: c["start"])
+    for c, nxt in zip(caps, caps[1:]):     # one caption on screen at a time
+        if c["end"] > nxt["start"]:
+            c["end"] = nxt["start"]
     overlays = []
-    for j, o in enumerate(list(tl.get("overlays") or []) + _captions(tl, segs)
-                          + _vo_captions(tl, ad_dir, pos / float(fps))):
+    for j, o in enumerate(list(tl.get("overlays") or []) + caps):
         if o.get("aspects") and aspect not in o["aspects"]:
             continue
         ov = dict(o)
@@ -177,6 +181,8 @@ def _emit(out, cfg, ch, a, b, to_tl):
 
     base = {"style": cfg.get("style", "caption"), "pos": cfg.get("pos", "caption"),
             "size": cfg.get("size", 1), "_caption": True}
+    if cfg.get("track"):
+        base["track"] = cfg["track"]
     if not cfg.get("build"):
         out.append(dict(base, text=fmt(ch), start=a, end=b))
         return

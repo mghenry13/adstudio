@@ -35,7 +35,9 @@ shot logs give `subject_x`, `subject_y`), `focus_by_aspect: {"1:1": [x, y]}`,
 
 Each has `start` and `end` on the ad's clock, or `seg: <index>` to make them
 relative to one segment (they then move with it). `fade` defaults to 0.12;
-`fade_in` / `fade_out` set one side only (a fade to black is a full-frame
+`"track": true` (or a number, the strength) makes an overlay ride the camera
+motion of the footage under it, measured with Apple Vision (`bin/track`), so text
+feels placed in the scene; it resets at each cut. `fade_in` / `fade_out` set one side only (a fade to black is a full-frame
 overlay with `fade_in` and `"fade_out": 0` at the end).
 `aspects: ["9:16"]` limits an overlay to some sizes.
 
@@ -60,7 +62,8 @@ brand kit. Use absolute `file://` URLs for its `@font-face` sources.
 `null` for none. Otherwise built from the Parakeet transcript of every footage
 segment that has sound: `max_words` (3), `max_chars` (18), `upper`, `style`, `pos`, `size`.
 
-Options: `build: true` reveals each chunk word by word; `emphasis: ["home", "50"]`
+Options: `track: true` makes captions move with the camera (see overlays);
+`build: true` reveals each chunk word by word; `emphasis: ["home", "50"]`
 marks those words as highlighted (`em`, which a style or ad.css can make bigger).
 
 ## music and sfx

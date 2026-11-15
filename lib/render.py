@@ -21,7 +21,7 @@ from . import timeline as T
 from .util import (BRANDS, RCACHE, Fail, Timer, config, file_sig, out, rel,
                    resolve, run, save_json, sha)
 
-RENDER_VERSION = 3
+RENDER_VERSION = 4
 EPS = 1e-4
 
 
@@ -102,7 +102,8 @@ def _seg_key(seg, R, W, H, mode, slices):
     else:
         spec.update(color=brand_color(R["brand"], seg["color"]))
     spec["ov"] = [[sl["ov"].get("key") or file_sig(sl["ov"]["video"]),
-                   sl["a"], sl["b"], sl["fi"], sl["fo"], sl["off"]] for sl in slices]
+                   sl["a"], sl["b"], sl["fi"], sl["fo"], sl["off"], sl["ov"].get("track")]
+                  for sl in slices]
     return sha(spec)[:24]
 
 
@@ -140,6 +141,12 @@ def _render_segment(seg, R, W, H, mode, slices, dst):
         args = ["-f", "lavfi", "-i", "color=c=%s:s=%dx%d:r=%d:d=%.3f" % (col, W, H, fps, dur + 0.5)]
         chain = []
     chain += ["fps=%d" % fps, "tpad=stop_mode=clone:stop_duration=1", "format=yuv420p"]
+    moving = None                      # scene motion for overlays with "track"
+    if seg["type"] == "clip" and any(sl["ov"].get("track") for sl in slices):
+        from . import track
+        m = seg["meta"]
+        cw, ch, _, _ = crop_fracs(m["width"], m["height"], W, H, seg)
+        moving = (track.motion(m, seg["in"], seg["out"]), W / cw, H / ch, seg["speed"])
     graph = ["[0:v]" + ",".join(chain) + "[b0]"]
     last = "b0"
     for i, sl in enumerate(slices):
@@ -157,8 +164,16 @@ def _render_segment(seg, R, W, H, mode, slices, dst):
         if sl["fo"] > 0:
             f += ",fade=t=out:st=%.4f:d=%.4f:alpha=1" % (max(sl["a"], sl["b"] - sl["fo"]), sl["fo"])
         graph.append(f + "[o%d]" % k)
-        graph.append("[%s][o%d]overlay=0:0:eof_action=pass:enable='gte(t,%.4f)*lt(t,%.4f)'[b%d]"
-                     % (last, k, sl["a"], sl["b"], k))
+        xy = "0:0"
+        if moving and ov.get("track"):
+            from . import track
+            pts, sx, sy, sp = moving
+            gain = 1.0 if ov["track"] is True else float(ov["track"])
+            # at most 9% of the frame width / 5% of its height, so text stays readable
+            xy = "x='%s':y='%s'" % (track.expr(pts, sx * gain, "x", sl["a"], sp, 0.09 * W),
+                                    track.expr(pts, sy * gain, "y", sl["a"], sp, 0.05 * H))
+        graph.append("[%s][o%d]overlay=%s:eof_action=pass:enable='gte(t,%.4f)*lt(t,%.4f)'[b%d]"
+                     % (last, k, xy, sl["a"], sl["b"], k))
         last = "b%d" % k
     tmp = dst + ".tmp.mp4"
     run(["ffmpeg", "-v", "error", "-y"] + args +
