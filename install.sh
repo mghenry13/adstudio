@@ -11,7 +11,11 @@
 # Options (environment variables):
 #   ADSTUDIO_DIR=~/somewhere    where the tool goes (default ~/adstudio)
 #   ADSTUDIO_WORKSPACE=~/path   where your brands and ads go (default ~/adstudio-work)
-#   ADSTUDIO_SKIP_KEY=1         do not ask for the Gemini key
+#   ADSTUDIO_SKIP_KEY=1         do not ask for the (optional) Gemini key
+#
+# Claude can run this for you too: see INSTALL.md. Without a keyboard it never
+# waits for input; the two steps that need you (the Xcode pop-up and your Mac
+# password for Homebrew) stop the script with a message saying what to do.
 
 set -euo pipefail
 
@@ -26,10 +30,13 @@ ok()   { printf '    %sok%s %s\n' "$green" "$off" "$1"; }
 die()  { printf '\n%sStopped: %s%s\n' "$red" "$1" "$off" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
+# A person at a keyboard, or Claude running this for them (no keyboard).
+if ( : </dev/tty ) 2>/dev/null; then TTY=1; else TTY=; fi
+
 # Reads from the keyboard even when this script arrives through a pipe.
 ask() {  # ask <prompt> <var> [hidden]
   local reply=""
-  if [ -r /dev/tty ]; then
+  if [ -n "$TTY" ]; then
     if [ "${3:-}" = hidden ]; then
       read -r -s -p "$1" reply </dev/tty || true; echo
     else
@@ -53,6 +60,10 @@ if xcode-select -p >/dev/null 2>&1; then
   ok "already installed"
 else
   xcode-select --install >/dev/null 2>&1 || true
+  if [ -z "$TTY" ]; then
+    printf '\nNEEDS_YOU: xcode\n'
+    die "A window popped up asking to install the command line developer tools. Click Install, agree, wait for it to finish (5 to 10 minutes), then run this again."
+  fi
   note "A window popped up. Click Install, agree, and wait for it to finish."
   note "This script carries on by itself when it is done."
   until xcode-select -p >/dev/null 2>&1; do sleep 5; done
@@ -63,6 +74,13 @@ fi
 step "Homebrew"
 if [ -x /opt/homebrew/bin/brew ]; then
   ok "already installed"
+elif [ -z "$TTY" ]; then
+  printf '\nNEEDS_YOU: homebrew\n'
+  die "Homebrew needs your Mac password, so it has to be installed in Terminal. Open Terminal, paste this line, press Return and type your password when asked:
+
+    /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"
+
+Then run this again."
 else
   note "Installing Homebrew. It asks for your Mac password (nothing shows as you type)."
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" </dev/tty
@@ -140,15 +158,22 @@ else
 fi
 
 # ---------------------------------------------------------------- 7. Gemini key
-step "Gemini API key (analyses your footage)"
+step "Gemini API key (optional: lets adstudio look at your footage and tag every shot)"
 keys="$("$LAUNCHER" key 2>/dev/null || true)"
 if printf '%s\n' "$keys" | grep -Eq '^ *gemini +not set'; then
-  if [ -n "${ADSTUDIO_SKIP_KEY:-}" ] || [ ! -r /dev/tty ]; then
-    note "skipped. Later: $LAUNCHER key gemini"
+  if [ -n "${ADSTUDIO_SKIP_KEY:-}" ] || [ -z "$TTY" ]; then
+    note "skipped. adstudio works without it; footage is still transcribed."
+    note "Add it any time: $LAUNCHER key gemini"
   else
-    note "Opening Google AI Studio. Sign in, click Create API key, and copy it."
-    open "https://aistudio.google.com/apikey" 2>/dev/null || true
-    ask "    Paste the key here (hidden) and press Enter, or just Enter to skip: " KEY hidden
+    note "Without a key adstudio still works: footage is transcribed, but shots"
+    note "are not tagged by what is in them. You can add one any time."
+    ask "    Set up a free Gemini key now? [y/N] " WANT
+    KEY=""
+    if [[ "$WANT" == [yY]* ]]; then
+      note "Opening Google AI Studio. Sign in, click Create API key, and copy it."
+      open "https://aistudio.google.com/apikey" 2>/dev/null || true
+      ask "    Paste the key here (hidden) and press Enter: " KEY hidden
+    fi
     if [ -n "$KEY" ]; then
       printf '%s' "$KEY" | "$LAUNCHER" key gemini || note "not saved. Try again later: $LAUNCHER key gemini"
     else
@@ -163,7 +188,7 @@ fi
 # ---------------------------------------------------------------- check
 step "Checking everything"
 "$LAUNCHER" doctor || true
-note "${dim}MISS is fine for: parakeet model (downloads on first use), HyperFrames CLI, runware key${off}"
+note "${dim}MISS is fine for: parakeet model (downloads on first use), HyperFrames CLI, gemini key, runware key${off}"
 
 printf '\n%s%sadstudio is ready.%s\n\n' "$bold" "$green" "$off"
 cat <<EOF

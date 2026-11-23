@@ -30,8 +30,13 @@ run `./adstudio setup` from the repo, then `adstudio doctor`.
    Only run `render` when the user wants finals.
 3. One chat edits a given ad at a time.
 4. Footage is never modified. Everything derived lives in `media/`.
-5. API keys are per user and never in the repo or in chat. If a key is
-   missing, tell the user to run `adstudio key gemini --paste` themselves.
+5. API keys are per user and never in the repo or in chat. The Gemini key is
+   optional: without it footage is still transcribed and searchable by what
+   is said, but shots are not tagged by what is in them and `ref add` does
+   not work. If a step needs it, say so and offer: copy the key from
+   https://aistudio.google.com/apikey, then you run
+   `adstudio key gemini --paste` (it reads the clipboard and clears it).
+   Never ask the user to paste a key into the chat.
 6. Check your own work before showing it: pull frames from the preview and
    look at them (ffmpeg select filter, or `adstudio sheet`).
 7. Sound in paid ads needs a known licence. `lib add` records it; do not

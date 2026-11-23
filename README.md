@@ -6,26 +6,40 @@ is kept on a page where you leave timecoded comments.
 
 ## Install
 
-You need a Mac with Apple Silicon (M1 or newer). Open Terminal (press
-Command+Space, type Terminal, press Return), paste this line and press Return:
+You need a Mac with Apple Silicon (M1 or newer) and
+[Claude Code](https://claude.com/claude-code) (in the Claude desktop app or
+in Terminal). Paste this into Claude Code:
+
+    Install Ad Studio for me: https://raw.githubusercontent.com/mghenry13/adstudio/main/INSTALL.md
+
+Claude installs everything that is missing (Xcode command line tools,
+Homebrew, ffmpeg, Node, Google Chrome and adstudio itself), checks it, and
+tells you when it is ready. On a new Mac it may ask you to click Install in a
+pop-up once, and to paste one line into Terminal so Homebrew can ask for your
+Mac password. Your password never goes through Claude.
+
+To update later, tell Claude "update adstudio".
+
+### Without Claude: one line in Terminal
+
+Open Terminal (Command+Space, type Terminal, press Return), paste this and
+press Return:
 
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mghenry13/adstudio/main/install.sh)"
 
-That is the whole install. It takes 5 to 15 minutes on a new Mac, mostly
-downloads, and it:
+It does the same steps, and also installs Claude Code if you do not have it.
+Running it again is safe and updates adstudio. You can read it first at
+[install.sh](install.sh).
 
-- installs anything missing: Xcode command line tools, Homebrew, ffmpeg,
-  Node, Google Chrome and Claude Code
-- downloads adstudio to `~/adstudio` and sets up your workspace in
-  `~/adstudio-work`
-- opens Google AI Studio so you can create a free Gemini API key, and saves
-  it on your Mac only (it is never put in this repo or in a chat)
-- checks everything and tells you what to do next
+### Gemini key (optional)
 
-You may be asked for your Mac password once (Homebrew needs it), and to click
-Install in a pop-up window for the Xcode tools. Running the line again is
-safe: it skips what you have and updates adstudio. You can read the script
-first at [install.sh](install.sh).
+A free Gemini key lets adstudio look at your footage and tag every shot by
+what is in it, and break down reference ads. Without one, footage is still
+transcribed and searchable by what is said. To add one any time, copy a key
+from https://aistudio.google.com/apikey and run
+`~/.config/adstudio/adstudio key gemini --paste` (or ask Claude to run it).
+It reads the key from your clipboard, clears it, and saves it on your Mac
+only. Never paste a key into a chat.
 
 <details>
 <summary>Install by hand instead</summary>
@@ -48,8 +62,7 @@ have the tool they install.
    Setup creates your workspace (`~/adstudio-work`, or pass another folder:
    `./adstudio setup ~/path/to/folder`), installs the skill for Claude Code
    and builds the helpers.
-7. Your Gemini key from https://aistudio.google.com/apikey:
-   `~/.config/adstudio/adstudio key gemini` and paste it when asked
+7. Optional, your Gemini key (see above)
 8. Check: `~/.config/adstudio/adstudio doctor`
 
 </details>
@@ -57,7 +70,8 @@ have the tool they install.
 After installing, every line of `~/.config/adstudio/adstudio doctor` should
 say `ok`, except these, which are fine to see as `MISS`: `parakeet model`
 (downloads itself, about 500 MB, the first time footage is transcribed),
-`HyperFrames CLI` (only needed for animations) and `runware key`.
+`HyperFrames CLI` (only needed for animations), `gemini key` and
+`runware key` (both optional).
 
 ### If something goes wrong
 
@@ -73,7 +87,7 @@ say `ok`, except these, which are fine to see as `MISS`: `parakeet model`
 | Claude does not know about adstudio | Open a new Claude Code chat; chats opened before setup do not see it |
 | The ad page does not load | `~/.config/adstudio/adstudio serve` and leave it running |
 
-To update later, run the install line again (or `cd ~/adstudio && git pull && ./adstudio setup`).
+To update later, tell Claude "update adstudio", or run the install line again.
 
 ## Your first ad
 

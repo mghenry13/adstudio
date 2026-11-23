@@ -91,9 +91,9 @@ def setup(workspace=None):
     out("command: %s" % LAUNCHER)
     out("")
     out("Next:")
-    out("  1. %s key gemini --paste     (copy your Gemini API key first)" % LAUNCHER)
-    out("  2. %s brand new <your-brand>" % LAUNCHER)
-    out("  3. open a new Claude Code chat and say: make an ad for <your-brand>")
+    out("  1. open a new Claude Code chat and say: make an ad for <your-brand>")
+    out("  2. optional, to tag shots by what is in them: copy a Gemini API key,")
+    out("     then run: %s key gemini --paste" % LAUNCHER)
 
 
 def brand_new(name):
