@@ -6,57 +6,65 @@ is kept on a page where you leave timecoded comments.
 
 ## Install
 
-You need a Mac with Apple Silicon (M1 or newer) and
-[Claude Code](https://claude.com/claude-code). Open Terminal and run these
-in order. Steps 1 to 3 can be skipped if you already have the tool they install.
+You need a Mac with Apple Silicon (M1 or newer). Open Terminal (press
+Command+Space, type Terminal, press Return), paste this line and press Return:
 
-**1. Xcode command line tools** (gives you git and Swift; a window pops up, click Install and wait for it to finish)
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/mghenry13/adstudio/main/install.sh)"
 
-    xcode-select --install
+That is the whole install. It takes 5 to 15 minutes on a new Mac, mostly
+downloads, and it:
 
-**2. Homebrew** (the Mac package manager; skip if `brew --version` prints a version)
+- installs anything missing: Xcode command line tools, Homebrew, ffmpeg,
+  Node, Google Chrome and Claude Code
+- downloads adstudio to `~/adstudio` and sets up your workspace in
+  `~/adstudio-work`
+- opens Google AI Studio so you can create a free Gemini API key, and saves
+  it on your Mac only (it is never put in this repo or in a chat)
+- checks everything and tells you what to do next
 
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+You may be asked for your Mac password once (Homebrew needs it), and to click
+Install in a pop-up window for the Xcode tools. Running the line again is
+safe: it skips what you have and updates adstudio. You can read the script
+first at [install.sh](install.sh).
 
-When it finishes it prints two "Next steps" lines. Run them, then close and reopen Terminal.
+<details>
+<summary>Install by hand instead</summary>
 
-**3. ffmpeg and Node**
+Run these in Terminal in order. Steps 1 to 3 can be skipped if you already
+have the tool they install.
 
-    brew install ffmpeg node
+1. Xcode command line tools: `xcode-select --install` (click Install and wait)
+2. Homebrew: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`,
+   then run the two "Next steps" lines it prints and reopen Terminal
+3. `brew install ffmpeg node`
+4. Google Chrome in your Applications folder: https://www.google.com/chrome/
+5. [Claude Code](https://claude.com/claude-code)
+6. adstudio:
 
-**4. Google Chrome**, if it is not already in your Applications folder: https://www.google.com/chrome/
+       git clone https://github.com/mghenry13/adstudio.git ~/adstudio
+       cd ~/adstudio
+       ./adstudio setup
 
-**5. adstudio itself**
+   Setup creates your workspace (`~/adstudio-work`, or pass another folder:
+   `./adstudio setup ~/path/to/folder`), installs the skill for Claude Code
+   and builds the helpers.
+7. Your Gemini key from https://aistudio.google.com/apikey:
+   `~/.config/adstudio/adstudio key gemini` and paste it when asked
+8. Check: `~/.config/adstudio/adstudio doctor`
 
-    git clone https://github.com/mghenry13/adstudio.git ~/adstudio
-    cd ~/adstudio
-    ./adstudio setup
+</details>
 
-Setup creates your workspace (`~/adstudio-work`, or pass another folder:
-`./adstudio setup ~/path/to/folder`), installs the skill for Claude Code and
-builds the helpers. It takes about a minute and is safe to run again.
-
-**6. Your Gemini API key.** Create one at https://aistudio.google.com/apikey,
-copy it, then run:
-
-    ~/.config/adstudio/adstudio key gemini --paste
-
-The key is saved in `~/.config/adstudio/` on your Mac only. It is never put
-in this repo or in a chat.
-
-**7. Check everything**
-
-    ~/.config/adstudio/adstudio doctor
-
-Every line should say `ok`, except these, which are fine to see as `MISS`:
-`parakeet model` (downloads itself, about 500 MB, the first time footage is
-transcribed), `HyperFrames CLI` (only needed for animations) and `runware key`.
+After installing, every line of `~/.config/adstudio/adstudio doctor` should
+say `ok`, except these, which are fine to see as `MISS`: `parakeet model`
+(downloads itself, about 500 MB, the first time footage is transcribed),
+`HyperFrames CLI` (only needed for animations) and `runware key`.
 
 ### If something goes wrong
 
 | You see | Do this |
 |---|---|
-| `command not found: brew` after installing Homebrew | Run the two "Next steps" lines Homebrew printed, then reopen Terminal |
+| The install line stopped partway | Run it again; it picks up where it left off |
+| `command not found: brew` or `claude` | Open a new Terminal window |
 | `MISS ffmpeg` or `MISS node` | `brew install ffmpeg node` |
 | `MISS swift` | `xcode-select --install`, wait for it to finish, then `./adstudio setup` again |
 | `MISS ffmpeg scale_vt` or `videotoolbox` | `brew upgrade ffmpeg` |
@@ -65,7 +73,7 @@ transcribed), `HyperFrames CLI` (only needed for animations) and `runware key`.
 | Claude does not know about adstudio | Open a new Claude Code chat; chats opened before setup do not see it |
 | The ad page does not load | `~/.config/adstudio/adstudio serve` and leave it running |
 
-To update later: `cd ~/adstudio && git pull && ./adstudio setup`.
+To update later, run the install line again (or `cd ~/adstudio && git pull && ./adstudio setup`).
 
 ## Your first ad
 

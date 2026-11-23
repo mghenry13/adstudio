@@ -73,7 +73,9 @@ def setup(workspace=None):
         out("MISSING: Google Chrome (https://www.google.com/chrome/), needed to draw text")
     if shutil.which("npm") and not os.path.isdir(os.path.join(ROOT, "node_modules", "playwright-core")):
         out("installing the page renderer (npm install)...")
-        r = subprocess.run(["npm", "install", "--silent"], cwd=ROOT, capture_output=True, text=True)
+        # npm ci installs exactly what package-lock.json says and never rewrites
+        # it, so `git pull` keeps working for updates.
+        r = subprocess.run(["npm", "ci", "--silent"], cwd=ROOT, capture_output=True, text=True)
         if r.returncode != 0:
             out("  npm install failed: %s" % (r.stderr or r.stdout)[-300:])
     if shutil.which("swift"):
