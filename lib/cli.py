@@ -418,7 +418,7 @@ def cmd_doctor(a):
         "present" if os.path.isdir(transcribe.MODEL_DIR) else "downloads on first transcribe")
     hf = gfx.cli_path()
     row("HyperFrames CLI", bool(hf), hf or "install the HyperFrames app")
-    row("gemini key", bool(read_key("gemini")), "set with: adstudio key gemini")
+    row("gemini key", bool(read_key("gemini")), "optional, tags shots: adstudio key gemini")
     row("runware key", bool(read_key("runware")), "for scratch VO and Runware analysis: adstudio key runware")
     out("config: %s" % json.dumps(config()))
     return 0 if ok else 1

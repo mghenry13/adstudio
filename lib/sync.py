@@ -15,7 +15,7 @@ import time
 
 from . import analyze, media, transcribe
 from .util import (IMAGE_EXT, MEDIA, VIDEO_EXT, WORK, Fail, Timer, load_json, out,
-                   save_json)
+                   read_key, save_json)
 
 SEEN = os.path.join(MEDIA, "seen.json")
 LEGACY = os.path.join(WORK, "sources.json")
@@ -181,4 +181,8 @@ def _backlog(do_analyze, brand=None):
         os.path.join(media.clip_dir(m["id"]), "shots.json"))]
     if todo:
         out("%d files in the catalog have no shot log yet" % len(todo))
+        if not read_key("gemini"):
+            # The key is optional: transcripts and search on speech still work.
+            out("  no Gemini key, so shots are not tagged (optional: adstudio key gemini)")
+            return
         analyze.run_for(todo)
